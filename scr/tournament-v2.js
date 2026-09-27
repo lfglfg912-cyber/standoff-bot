@@ -21,7 +21,7 @@ export async function initTournamentV2Db() {
     );
 
     CREATE TABLE IF NOT EXISTS tournament_team_members (
-      team_id BIGINT NOT NULL REFERENCES tournament_teams(id) ON DELETE CASCADE,
+      team_id BIGINT REFERENCES tournament_teams(id) ON DELETE CASCADE,
       discord_id TEXT NOT NULL REFERENCES players(discord_id) ON DELETE CASCADE,
       joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (team_id, discord_id)
@@ -305,7 +305,7 @@ export async function banMap(matchId, discordId, mapName) {
     const already = await client.query('SELECT 1 FROM match_map_veto WHERE match_id = $1 AND map_name = $2', [matchId, mapName]);
     if (already.rows.length) throw new Error('MAP_ALREADY_BANNED');
 
-    await client.query('INSERT INTO match_map_veto (match_id, step, team_id, action, map_name) VALUES ($1,$2,$3,$4,$5)', [matchId, step, isTeam ? teamId : 0, 'ban', mapName]);
+    await client.query('INSERT INTO match_map_veto (match_id, step, team_id, action, map_name) VALUES ($1,$2,$3,$4,$5)', [matchId, step, isTeam ? teamId : null, 'ban', mapName]);
 
     const nextStep = step + 1;
     if (nextStep >= pool.length - 1) {
