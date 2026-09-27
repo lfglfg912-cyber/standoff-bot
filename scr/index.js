@@ -4,7 +4,7 @@ import {
   REST, Routes
 } from 'discord.js';
 import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileEmbed, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons } from './ui.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
@@ -29,7 +29,7 @@ async function showProfile(interaction) {
     await interaction.showModal(profileModal());
     return;
   }
-  await interaction.reply({ embeds: [profileEmbed(player, interaction.user)], components: profileButtons(), ephemeral: true });
+  await interaction.reply({ ...(await profileCard(player, interaction.user)), ephemeral: true });
 }
 
 async function sendMainPanel(channel) {
@@ -75,6 +75,13 @@ client.on(Events.InteractionCreate, async interaction => {
           return interaction.reply({ embeds: [tournamentsEmbed(ts)], components: tournamentButtons(ts), ephemeral: true });
         }
         if (action === 'matches') return interaction.reply({ ...(await matchesEmbed(interaction.user.id)), ephemeral: true });
+        if (action === 'stats') {
+          const player = await ensurePlayer(interaction);
+          if (!player) return interaction.showModal(profileModal());
+          return interaction.reply({ embeds: [profileStatsEmbed(player)], components: profileButtons(), ephemeral: true });
+        }
+        if (action === 'achievements') return interaction.reply({ embeds: [profileSimpleSection('🏆 Достижения', 'Система достижений подключается следующим модулем. Здесь будут MVP, серии побед и награды турниров.')], components: profileButtons(), ephemeral: true });
+        if (action === 'history') return interaction.reply({ embeds: [profileSimpleSection('🕘 История', 'Здесь будет история матчей, изменения рейтинга и полученные звания.')], components: profileButtons(), ephemeral: true });
         if (action === 'ai') {
           if (!aiEnabled()) return interaction.reply({ content: '🤖 AI пока не подключён. Администратору нужно добавить OPENAI_API_KEY.', ephemeral: true });
           return interaction.showModal(aiModal());
