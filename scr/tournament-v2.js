@@ -41,6 +41,8 @@ export async function initTournamentV2Db() {
       UNIQUE (match_id, map_name)
     );
 
+    ALTER TABLE match_map_veto ALTER COLUMN team_id DROP NOT NULL;
+
     CREATE TABLE IF NOT EXISTS match_map_votes (
       id BIGSERIAL PRIMARY KEY,
       match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
