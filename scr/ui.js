@@ -124,7 +124,8 @@ export function profileButtons() {
       new ButtonBuilder().setCustomId('nav:history').setLabel('🕘 История').setStyle(ButtonStyle.Secondary)
     ),
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('profile:edit').setLabel('✏️ Изменить профиль').setStyle(ButtonStyle.Primary)
+      new ButtonBuilder().setCustomId('profile:edit').setLabel('✏️ Изменить профиль').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('profile:verify').setLabel('🔐 Верификация').setStyle(ButtonStyle.Success)
     )
   ];
 }
