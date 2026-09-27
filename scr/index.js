@@ -3,11 +3,11 @@ import {
   Client, GatewayIntentBits, Events, PermissionsBitField, EmbedBuilder,
   REST, Routes
 } from 'discord.js';
-import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
+import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch, startVerification, getVerificationRequest, finishVerification } from './db.js';
 import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customGameModal, customGameButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
-import { aiEnabled, askAI, analyzeCustomResultScreenshot } from './ai.js';
+import { aiEnabled, askAI, analyzeCustomResultScreenshot, analyzeProfileVerificationScreenshot } from './ai.js';
 
 const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_GUILD_ID', 'PANEL_CHANNEL_ID', 'ADMIN_ROLE_ID'];
 for (const key of required) if (!process.env[key]) throw new Error(`Missing environment variable: ${key}`);
@@ -63,6 +63,21 @@ client.on(Events.MessageCreate, async message => {
       return type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(a.name || '');
     });
     if (!image) return;
+    const verification = await getVerificationRequest(message.author.id);
+    if (verification?.status === 'pending') {
+      const player = await getPlayer(message.author.id);
+      if (!player) return;
+      await message.react('🔎').catch(() => {});
+      const result = await analyzeProfileVerificationScreenshot(image.url, player);
+      await finishVerification(message.author.id, result.valid, result.reason || 'Проверка изображения не пройдена.');
+      if (!result.valid) {
+        await message.react('❌').catch(() => {});
+        return message.reply('❌ **Верификация не пройдена.**\\n' + (result.reason || 'Бот не смог уверенно прочитать ник и ID на скриншоте.') + '\\nПроверь, что это профиль Standoff 2 и на одном скрине хорошо видны **ник и ID**.');
+      }
+      await message.react('✅').catch(() => {});
+      return message.reply('✅ **Профиль успешно верифицирован автоматически.**\\nНик и ID на скриншоте совпали с данными профиля DOMINION.');
+    }
+
     const games = await getReadyCustomGamesForPlayer(message.author.id);
     if (!games.length) return;
     const idFromText = message.content.match(/#(\d+)/)?.[1];
@@ -160,6 +175,13 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       if (scope === 'profile') {
+        if (action === 'verify') {
+          const player = await getPlayer(interaction.user.id);
+          if (!player) return interaction.reply({ content: 'Сначала создай профиль.', ephemeral: true });
+          if (player.verified) return interaction.reply({ content: '✅ Твой профиль уже верифицирован.', ephemeral: true });
+          await startVerification(interaction.user.id);
+          return interaction.reply({ content: '🔐 **Верификация запущена.**\\nОтправь следующим сообщением **один скрин профиля Standoff 2**, где одновременно хорошо видны твой **ник и ID**. Бот проверит его автоматически.', ephemeral: true });
+        }
         if (action === 'edit') {
           const player = await getPlayer(interaction.user.id);
           return interaction.showModal(profileModal(player));
