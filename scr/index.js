@@ -6,13 +6,13 @@ import {
 import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
 import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customGameModal, customGameButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
-import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer } from './tournament-v2.js';
-import { aiEnabled, askAI } from './ai.js';
+import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
+import { aiEnabled, askAI, analyzeCustomResultScreenshot } from './ai.js';
 
 const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_GUILD_ID', 'PANEL_CHANNEL_ID', 'ADMIN_ROLE_ID'];
 for (const key of required) if (!process.env[key]) throw new Error(`Missing environment variable: ${key}`);
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 
 function isAdmin(interaction) {
   if (!interaction.inGuild()) return false;
@@ -54,6 +54,37 @@ async function sendMainPanel(channel) {
   return channel.send(mainPanel());
 }
 
+
+client.on(Events.MessageCreate, async message => {
+  try {
+    if (message.author.bot || !message.inGuild()) return;
+    const image = message.attachments.find(a => {
+      const type = a.contentType || '';
+      return type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(a.name || '');
+    });
+    if (!image) return;
+    const games = await getReadyCustomGamesForPlayer(message.author.id);
+    if (!games.length) return;
+    const idFromText = message.content.match(/#(\d+)/)?.[1];
+    let game;
+    if (idFromText) game = games.find(g => String(g.id) === idFromText);
+    else if (games.length === 1) game = games[0];
+    if (!game) return message.reply('📸 Скрин получен. У тебя несколько активных кастомов. Укажи номер матча, например **#12**, чтобы бот проверил именно его.');
+    await message.react('🔎').catch(() => {});
+    const result = await analyzeCustomResultScreenshot(image.url, game);
+    if (!result.valid) {
+      await message.react('❌').catch(() => {});
+      return message.reply({ content: '❌ **Результат не подтверждён.**\nБот не смог надёжно подтвердить скриншот: нужен экран результата Standoff 2, читаемый счёт и все игроки этого кастома. **Рейтинг не изменён.**' + (result.missing_players?.length ? '\nНе распознаны: ' + result.missing_players.join(', ') : '') });
+    }
+    await reportCustomGame(game.id, message.author.id, result.winner_team);
+    await message.react('✅').catch(() => {});
+    const winner = result.winner_team === 1 ? 'Команда 1' : 'Команда 2';
+    return message.reply('✅ **Кастом #' + game.id + ' подтверждён автоматически по скриншоту.**\n🏆 Победитель: **' + winner + '**\n📊 Счёт: **' + result.score_team1 + ':' + result.score_team2 + '**\n🗺️ Карта: **' + (game.selected_map || 'не указана') + '**\n⭐ Победителям **+15 рейтинга**, проигравшим **−10 рейтинга**.');
+  } catch (error) {
+    console.error('[DOMINION] Screenshot result error:', error);
+    await message.reply('⚠️ Не удалось автоматически проверить скриншот. Рейтинг не изменён.').catch(() => {});
+  }
+});
 client.once(Events.ClientReady, async ready => {
   console.log(`[DOMINION] Logged in as ${ready.user.tag}`);
   try {
