@@ -35,8 +35,11 @@ export async function tournamentView(id) {
     const state=await getVetoState(m.id);
     if(state.match.veto_status==='active'){
       const banned=state.bans, remaining=(state.match.map_pool||[]).filter(x=>!banned.some(b=>b.map_name===x));
-      embed.addFields({name:`🚫 Veto · матч ${m.match_no}`,value:`Ход команды: **${state.match.veto_step%2===0?'1':'2'}**\\nОсталось: **${remaining.join(', ')}**\\nБаны: ${banned.length?banned.map(b=>b.map_name).join(', '):'нет'}`});
-      components.push(...vetoButtons(state.match,banned));
+      const majority = Math.floor(Number(state.participants || 0) / 2) + 1;
+      const voted = state.votedPlayers?.length || 0;
+      const voteText = state.votes?.length ? state.votes.map(v=>`${v.map_name}: **${v.votes}**`).join(' · ') : 'голосов пока нет';
+      embed.addFields({name:`🗳️ Голосование · матч ${m.match_no}`,value:`Игроков: **${state.participants}** · большинство: **${majority}**\\nПроголосовали: **${voted}/${state.participants}**\\nОсталось: **${remaining.join(', ')}**\\nГолоса: ${voteText}`});
+      components.push(...vetoButtons(state.match,banned,state.votes));
     }
     if(state.match.veto_status==='finished') components.push(...resultButtons(state.match));
   }
