@@ -123,6 +123,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (interaction.customId === 'profile:save') {
         const nick = interaction.fields.getTextInputValue('nick').trim();
         const sid = interaction.fields.getTextInputValue('standoff_id').trim();
+        if (!sid) return interaction.reply({ content: '❌ ID игрока Standoff 2 обязателен.', ephemeral: true });
         const player = await upsertPlayer(interaction.user.id, nick, sid);
         return interaction.reply({ embeds: [profileEmbed(player, interaction.user)], components: profileButtons(), ephemeral: true });
       }
