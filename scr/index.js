@@ -6,7 +6,7 @@ import {
 import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
 import { mainPanel, profileEmbed, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
-import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, banMap, reportMatchV2, getTournamentV2, TEAM_FORMATS } from './tournament-v2.js';
+import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
 
 const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_GUILD_ID', 'PANEL_CHANNEL_ID', 'ADMIN_ROLE_ID'];
@@ -121,9 +121,9 @@ client.on(Events.InteractionCreate, async interaction => {
         return interaction.showModal(tournamentCreateModal());
       }
 
-      if (scope === 'veto' && action === 'ban') {
+      if (scope === 'veto' && action === 'vote') {
         const mapName = decodeURIComponent(extra || '');
-        await banMap(id, interaction.user.id, mapName);
+        await castMapVote(id, interaction.user.id, mapName);
         return interaction.update(await tournamentView((await getTournamentV2(id)).id));
       }
 
@@ -177,9 +177,9 @@ client.on(Events.InteractionCreate, async interaction => {
       : error.message === 'REGISTRATION_CLOSED' ? 'Регистрация уже закрыта.'
       : error.message === 'MATCH_ALREADY_DONE' ? 'Этот матч уже завершён.'
       : error.message === 'NOT_A_PLAYER' ? 'Ты не участник этого матча.'
-      : error.message === 'NOT_CAPTAIN' ? 'Бан карты может делать только капитан команды.'
-      : error.message === 'NOT_YOUR_TURN' ? 'Сейчас ход другой стороны.'
-      : error.message === 'VETO_NOT_FINISHED' ? 'Сначала завершите бан карт.'
+      : error.message === 'ALREADY_VOTED' ? 'Ты уже проголосовал в этом раунде.'
+      : error.message === 'VETO_NOT_FINISHED' ? 'Сначала завершите голосование по картам.'
+      : error.message === 'INVALID_MAP' ? 'Эта карта сейчас недоступна для голосования.'
       : error.message === 'MAP_ALREADY_BANNED' ? 'Эта карта уже забанена.'
       : error.message === 'TEAM_MEMBER_PROFILE_MISSING' ? 'У всех участников должен быть профиль DOMINION.'
       : error.message === 'TEAM_MEMBER_ALREADY_REGISTERED' ? 'Один из участников уже зарегистрирован в другой команде этого турнира.'
