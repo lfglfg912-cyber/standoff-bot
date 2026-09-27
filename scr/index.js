@@ -215,7 +215,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (interaction.customId === 'custom:create') {
         const format = interaction.fields.getTextInputValue('format').trim().toLowerCase();
         const team1 = interaction.fields.getTextInputValue('team1').split(/[,;\s]+/).filter(Boolean);
-        const team2 = interaction.fields.getTextInputValue('team2').split(/[,;\\s]+/).filter(Boolean);
+        const team2 = interaction.fields.getTextInputValue('team2').split(/[,;\s]+/).filter(Boolean);
         const game = await createCustomGame({ format, team1Ids: team1, team2Ids: team2, createdBy: interaction.user.id });
         return interaction.reply({ ...(await customGameView(game.match.id)), ephemeral: true });
       }
