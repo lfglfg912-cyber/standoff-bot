@@ -43,6 +43,41 @@ export async function initTournamentV2Db() {
 
     ALTER TABLE match_map_veto ALTER COLUMN team_id DROP NOT NULL;
 
+    CREATE TABLE IF NOT EXISTS custom_matches (
+      id BIGSERIAL PRIMARY KEY,
+      format TEXT NOT NULL,
+      team1_ids TEXT[] NOT NULL,
+      team2_ids TEXT[] NOT NULL,
+      map_pool TEXT[] NOT NULL,
+      veto_status TEXT NOT NULL DEFAULT 'active',
+      veto_round INTEGER NOT NULL DEFAULT 1,
+      selected_map TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_by TEXT NOT NULL REFERENCES players(discord_id),
+      winner_team INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      completed_at TIMESTAMPTZ
+    );
+
+    CREATE TABLE IF NOT EXISTS custom_match_map_votes (
+      id BIGSERIAL PRIMARY KEY,
+      match_id BIGINT NOT NULL REFERENCES custom_matches(id) ON DELETE CASCADE,
+      discord_id TEXT NOT NULL REFERENCES players(discord_id) ON DELETE CASCADE,
+      veto_round INTEGER NOT NULL,
+      map_name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (match_id, discord_id, veto_round)
+    );
+
+    CREATE TABLE IF NOT EXISTS custom_match_map_bans (
+      id BIGSERIAL PRIMARY KEY,
+      match_id BIGINT NOT NULL REFERENCES custom_matches(id) ON DELETE CASCADE,
+      step INTEGER NOT NULL,
+      map_name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (match_id, map_name)
+    );
+
     CREATE TABLE IF NOT EXISTS match_map_votes (
       id BIGSERIAL PRIMARY KEY,
       match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -397,4 +432,102 @@ export async function reportMatchV2(matchId, reporterId, winnerId, winnerTeamId 
     await client.query('ROLLBACK');
     throw error;
   } finally { client.release(); }
+}
+
+export async function createCustomGame({ format, team1Ids, team2Ids, createdBy }) {
+  const normalized = normalizeFormat(format);
+  const size = TEAM_FORMATS[normalized];
+  if (!size) throw new Error('INVALID_FORMAT');
+  const clean = value => [...new Set(value.map(v => String(v).replace(/^<@!?(\\d+)>$/, '$1').trim()).filter(Boolean))];
+  const a = clean(team1Ids), b = clean(team2Ids);
+  if (a.length !== size || b.length !== size) throw new Error('NEED_CUSTOM_TEAM_SIZE');
+  if (a.some(id => b.includes(id))) throw new Error('CUSTOM_DUPLICATE_PLAYER');
+  if (![...a, ...b].includes(createdBy)) throw new Error('CUSTOM_CREATOR_NOT_PLAYER');
+  const players = await query('SELECT discord_id FROM players WHERE discord_id = ANY($1::text[])', [[...a, ...b]]);
+  if (players.rows.length !== size * 2) throw new Error('CUSTOM_PROFILE_MISSING');
+  const result = await query('INSERT INTO custom_matches (format, team1_ids, team2_ids, map_pool, created_by) VALUES ($1,$2,$3,$4,$5) RETURNING id', [normalized, a, b, MAP_POOL, createdBy]);
+  return getCustomGameState(result.rows[0].id);
+}
+
+export async function getCustomGameState(matchId) {
+  const result = await query('SELECT * FROM custom_matches WHERE id=$1', [matchId]);
+  if (!result.rows[0]) throw new Error('CUSTOM_NOT_FOUND');
+  const match = result.rows[0];
+  const bans = await query('SELECT * FROM custom_match_map_bans WHERE match_id=$1 ORDER BY step', [matchId]);
+  const votes = await query('SELECT map_name, COUNT(*)::int AS votes FROM custom_match_map_votes WHERE match_id=$1 AND veto_round=$2 GROUP BY map_name ORDER BY votes DESC,map_name', [matchId, match.veto_round || 1]);
+  const participants = [...new Set([...(match.team1_ids || []), ...(match.team2_ids || [])])];
+  const votedPlayers = await query('SELECT discord_id,map_name FROM custom_match_map_votes WHERE match_id=$1 AND veto_round=$2', [matchId, match.veto_round || 1]);
+  return { match, bans: bans.rows, votes: votes.rows, participants, votedPlayers: votedPlayers.rows };
+}
+
+export async function castCustomMapVote(matchId, discordId, mapName) {
+  const pool = (await import('./db.js')).pool;
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    const result = await db.query('SELECT * FROM custom_matches WHERE id=$1 FOR UPDATE', [matchId]);
+    const match = result.rows[0];
+    if (!match) throw new Error('CUSTOM_NOT_FOUND');
+    if (match.veto_status !== 'active') throw new Error('VETO_FINISHED');
+    const participants = [...new Set([...(match.team1_ids || []), ...(match.team2_ids || [])])];
+    if (!participants.includes(discordId)) throw new Error('NOT_A_PLAYER');
+    if (!match.map_pool.includes(mapName)) throw new Error('INVALID_MAP');
+    const banned = await db.query('SELECT map_name FROM custom_match_map_bans WHERE match_id=$1', [matchId]);
+    const remaining = match.map_pool.filter(x => !banned.rows.some(b => b.map_name === x));
+    if (!remaining.includes(mapName)) throw new Error('MAP_ALREADY_BANNED');
+    const round = match.veto_round || 1;
+    const existing = await db.query('SELECT 1 FROM custom_match_map_votes WHERE match_id=$1 AND discord_id=$2 AND veto_round=$3', [matchId,discordId,round]);
+    if (existing.rows.length) throw new Error('ALREADY_VOTED');
+    await db.query('INSERT INTO custom_match_map_votes(match_id,discord_id,veto_round,map_name) VALUES($1,$2,$3,$4)', [matchId,discordId,round,mapName]);
+    const counts = await db.query('SELECT map_name,COUNT(*)::int AS votes FROM custom_match_map_votes WHERE match_id=$1 AND veto_round=$2 GROUP BY map_name ORDER BY votes DESC,map_name', [matchId,round]);
+    const majority = Math.floor(participants.length / 2) + 1;
+    const totalVotes = counts.rows.reduce((sum,x) => sum + x.votes, 0);
+    let bannedMap = counts.rows.find(x => x.votes >= majority)?.map_name;
+    if (!bannedMap && totalVotes >= participants.length) {
+      bannedMap = counts.rows.slice().sort((a,b) => b.votes-a.votes || match.map_pool.indexOf(a.map_name)-match.map_pool.indexOf(b.map_name))[0]?.map_name;
+    }
+    if (bannedMap) {
+      const step = (await db.query('SELECT COUNT(*)::int AS count FROM custom_match_map_bans WHERE match_id=$1',[matchId])).rows[0].count;
+      await db.query('INSERT INTO custom_match_map_bans(match_id,step,map_name) VALUES($1,$2,$3)',[matchId,step,bannedMap]);
+      const next = remaining.filter(x => x !== bannedMap);
+      if (next.length === 1) await db.query("UPDATE custom_matches SET veto_round=$1,veto_status='finished',selected_map=$2 WHERE id=$3",[round+1,next[0],matchId]);
+      else await db.query('UPDATE custom_matches SET veto_round=$1 WHERE id=$2',[round+1,matchId]);
+      await db.query('DELETE FROM custom_match_map_votes WHERE match_id=$1 AND veto_round=$2',[matchId,round]);
+    }
+    await db.query('COMMIT');
+    return getCustomGameState(matchId);
+  } catch(error) {
+    await db.query('ROLLBACK');
+    throw error;
+  } finally {
+    db.release();
+  }
+}
+
+export async function reportCustomGame(matchId, reporterId, winnerTeam) {
+  const pool = (await import('./db.js')).pool;
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    const result = await db.query('SELECT * FROM custom_matches WHERE id=$1 FOR UPDATE',[matchId]);
+    const match = result.rows[0];
+    if (!match) throw new Error('CUSTOM_NOT_FOUND');
+    if (match.status === 'completed') throw new Error('MATCH_ALREADY_DONE');
+    if (match.veto_status !== 'finished') throw new Error('VETO_NOT_FINISHED');
+    const team1 = match.team1_ids || [], team2 = match.team2_ids || [];
+    if (![...team1,...team2].includes(reporterId)) throw new Error('NOT_A_PLAYER');
+    if (![1,2].includes(Number(winnerTeam))) throw new Error('INVALID_WINNER');
+    const winners = Number(winnerTeam) === 1 ? team1 : team2;
+    const losers = Number(winnerTeam) === 1 ? team2 : team1;
+    await db.query("UPDATE custom_matches SET status='completed',winner_team=$1,completed_at=NOW() WHERE id=$2",[winnerTeam,matchId]);
+    await db.query('UPDATE players SET wins=wins+1,rating=rating+15,updated_at=NOW() WHERE discord_id=ANY($1::text[])',[winners]);
+    await db.query('UPDATE players SET losses=losses+1,rating=GREATEST(0,rating-10),updated_at=NOW() WHERE discord_id=ANY($1::text[])',[losers]);
+    await db.query('COMMIT');
+    return true;
+  } catch(error) {
+    await db.query('ROLLBACK');
+    throw error;
+  } finally {
+    db.release();
+  }
 }
