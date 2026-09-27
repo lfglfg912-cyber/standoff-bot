@@ -160,7 +160,7 @@ export function customGameModal() {
 export function customGameButtons(game) {
   const rows = [];
   if (game?.veto_status === 'active') rows.push(...vetoButtons(game, game.bans || [], game.votes || [], 'custom'));
-  if (game?.veto_status === 'finished') rows.push(...resultButtons(game));
+  if (game?.veto_status === 'finished') rows.push(...customResultButtons(game));
   return rows;
 }
 
@@ -177,6 +177,13 @@ export function customGameButtons(game) {
   if (game?.veto_status === 'active') rows.push(...vetoButtons(game, game.bans || [], game.votes || [], 'custom'));
   if (game?.veto_status === 'finished') rows.push(...resultButtons(game));
   return rows;
+}
+
+export function customResultButtons(game) {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`custom:win:${game.id}:team:1`).setLabel('🏆 Победила команда 1').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`custom:win:${game.id}:team:2`).setLabel('🏆 Победила команда 2').setStyle(ButtonStyle.Success)
+  )];
 }
 
 export function profileModal(player = null) {
