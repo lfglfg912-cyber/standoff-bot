@@ -77,6 +77,8 @@ export async function initDb() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    UPDATE players SET verified = TRUE, updated_at = NOW() WHERE COALESCE(TRIM(standoff_nick), '') <> '' AND COALESCE(TRIM(standoff_id), '') <> '';
+
     CREATE TABLE IF NOT EXISTS ai_logs (
       id BIGSERIAL PRIMARY KEY,
       discord_id TEXT,
@@ -94,11 +96,12 @@ export async function getPlayer(discordId) {
 
 export async function upsertPlayer(discordId, nick, standoffId) {
   const { rows } = await query(`
-    INSERT INTO players (discord_id, standoff_nick, standoff_id)
-    VALUES ($1, $2, $3)
+    INSERT INTO players (discord_id, standoff_nick, standoff_id, verified)
+    VALUES ($1, $2, $3, TRUE)
     ON CONFLICT (discord_id) DO UPDATE SET
       standoff_nick = EXCLUDED.standoff_nick,
       standoff_id = EXCLUDED.standoff_id,
+      verified = TRUE,
       updated_at = NOW()
     RETURNING *
   `, [discordId, nick, standoffId || null]);
