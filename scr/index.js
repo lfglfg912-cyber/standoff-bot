@@ -4,9 +4,9 @@ import {
   REST, Routes
 } from 'discord.js';
 import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection } from './ui.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customGameModal, customGameButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
-import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS } from './tournament-v2.js';
+import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
 
 const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_GUILD_ID', 'PANEL_CHANNEL_ID', 'ADMIN_ROLE_ID'];
@@ -30,6 +30,21 @@ async function showProfile(interaction) {
     return;
   }
   await interaction.reply({ ...(await profileCard(player, interaction.user)), ephemeral: true });
+}
+
+
+async function customGameView(id) {
+  const state = await getCustomGameState(id);
+  const m = state.match;
+  const embed = new EmbedBuilder()
+    .setTitle(`⚔️ Кастом на звание #${m.id}`)
+    .setDescription(`Формат: **${m.format}**\\nСтатус: **${m.status === 'completed' ? 'Завершён' : m.veto_status === 'finished' ? 'Матч готов' : 'Бан карт'}**\\nКарта: **${m.selected_map || 'ещё не выбрана'}**\\nКоманда 1: ${m.team1_ids.map(x => `<@${x}>`).join(', ')}\\nКоманда 2: ${m.team2_ids.map(x => `<@${x}>`).join(', ')}`)
+    .setColor(0x8b0000);
+  if (m.veto_status === 'active') {
+    const majority = Math.floor(state.participants.length / 2) + 1;
+    embed.addFields({ name: '🗳️ Голосование карт', value: `Игроков: **${state.participants.length}** · большинство: **${majority}**\\nПроголосовали: **${state.votedPlayers.length}/${state.participants.length}**\\nОсталось: **${(m.map_pool || []).filter(x => !state.bans.some(b => b.map_name === x)).join(', ')}**` });
+  }
+  return { embeds: [embed], components: customGameButtons({ ...m, bans: state.bans, votes: state.votes }) };
 }
 
 async function sendMainPanel(channel) {
@@ -70,6 +85,15 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (scope === 'nav') {
         if (action === 'profile') return showProfile(interaction);
+        if (action === 'custom') {
+          const player = await ensurePlayer(interaction);
+          if (!player) return interaction.showModal(profileModal());
+          const games = await listCustomGamesForPlayer(interaction.user.id);
+          const embed = new EmbedBuilder().setTitle('⚔️ Кастомные игры на звание').setDescription(games.length ? games.map(g => `#${g.id} · **${g.format}** · ${g.selected_map ? '🗺️ ' + g.selected_map : '🚫 Бан карт'} · ${g.status === 'completed' ? 'завершён' : 'активен'}`).join('\\n') : 'Активных кастомов нет. Создай первый матч.').setColor(0x8b0000);
+          const components = [new (await import('discord.js')).ActionRowBuilder().addComponents(new (await import('discord.js')).ButtonBuilder().setCustomId('custom:new').setLabel('➕ Создать кастом').setStyle((await import('discord.js')).ButtonStyle.Success))];
+          for (const g of games.slice(0, 5)) components[0].addComponents(new (await import('discord.js')).ButtonBuilder().setCustomId('custom:view:' + g.id).setLabel('#' + g.id).setStyle((await import('discord.js')).ButtonStyle.Secondary));
+          return interaction.reply({ embeds: [embed], components, ephemeral: true });
+        }
         if (action === 'tournaments') {
           const ts = await listTournamentsV2();
           return interaction.reply({ embeds: [tournamentsEmbed(ts)], components: tournamentButtons(ts), ephemeral: true });
@@ -91,6 +115,17 @@ client.on(Events.InteractionCreate, async interaction => {
           if (!isAdmin(interaction)) return interaction.reply({ content: 'Эта панель доступна только администрации.', ephemeral: true });
           return interaction.reply({ ...adminPanel(), ephemeral: true });
         }
+      }
+
+      if (scope === 'custom' && action === 'new') return interaction.showModal(customGameModal());
+      if (scope === 'custom' && action === 'view') return interaction.reply({ ...(await customGameView(id)), ephemeral: true });
+      if (scope === 'custom' && action === 'vote') {
+        await castCustomMapVote(id, interaction.user.id, decodeURIComponent(extra || ''));
+        return interaction.update(await customGameView(id));
+      }
+      if (scope === 'custom' && action === 'win') {
+        await reportCustomGame(id, interaction.user.id, interaction.customId.split(':')[4]);
+        return interaction.reply({ content: '✅ Результат кастома сохранён. Рейтинг и звание игроков обновлены.', ephemeral: true });
       }
 
       if (scope === 'profile') {
@@ -145,6 +180,15 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     if (interaction.isModalSubmit()) {
+      
+      if (interaction.customId === 'custom:create') {
+        const format = interaction.fields.getTextInputValue('format').trim().toLowerCase();
+        const team1 = interaction.fields.getTextInputValue('team1').split(/[,;\\s]+/).filter(Boolean);
+        const team2 = interaction.fields.getTextInputValue('team2').split(/[,;\\s]+/).filter(Boolean);
+        const game = await createCustomGame({ format, team1Ids: team1, team2Ids: team2, createdBy: interaction.user.id });
+        return interaction.reply({ ...(await customGameView(game.match.id)), ephemeral: true });
+      }
+
       if (interaction.customId === 'profile:save') {
         const nick = interaction.fields.getTextInputValue('nick').trim();
         const sid = interaction.fields.getTextInputValue('standoff_id').trim();
@@ -186,6 +230,12 @@ client.on(Events.InteractionCreate, async interaction => {
       : error.message === 'NOT_A_PLAYER' ? 'Ты не участник этого матча.'
       : error.message === 'ALREADY_VOTED' ? 'Ты уже проголосовал в этом раунде.'
       : error.message === 'VETO_NOT_FINISHED' ? 'Сначала завершите голосование по картам.'
+      : error.message === 'INVALID_FORMAT' ? 'Формат должен быть 1v1, 2v2, 3v3, 4v4 или 5v5.'
+      : error.message === 'NEED_CUSTOM_TEAM_SIZE' ? 'Количество игроков в каждой команде не соответствует формату.'
+      : error.message === 'CUSTOM_DUPLICATE_PLAYER' ? 'Игрок не может находиться сразу в двух командах.'
+      : error.message === 'CUSTOM_CREATOR_NOT_PLAYER' ? 'Ты должен находиться в одной из команд.'
+      : error.message === 'CUSTOM_PROFILE_MISSING' ? 'У всех игроков должен быть профиль DOMINION.'
+      : error.message === 'CUSTOM_NOT_FOUND' ? 'Кастомная игра не найдена.'
       : error.message === 'INVALID_MAP' ? 'Эта карта сейчас недоступна для голосования.'
       : error.message === 'MAP_ALREADY_BANNED' ? 'Эта карта уже забанена.'
       : error.message === 'TEAM_MEMBER_PROFILE_MISSING' ? 'У всех участников должен быть профиль DOMINION.'
