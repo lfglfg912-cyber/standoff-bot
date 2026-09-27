@@ -59,23 +59,37 @@ client.on(Events.MessageCreate, async message => {
   try {
     if (message.author.bot || !message.inGuild()) return;
     const image = message.attachments.find(a => {
-      const type = a.contentType || '';
-      return type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(a.name || '');
+      const type = String(a.contentType || '').toLowerCase();
+      const name = String(a.name || '').toLowerCase();
+      return type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(name);
     });
-    if (!image) return;
     const verification = await getVerificationRequest(message.author.id);
     if (verification?.status === 'pending') {
-      const player = await getPlayer(message.author.id);
-      if (!player) return;
-      await message.react('🔎').catch(() => {});
-      const result = await analyzeProfileVerificationScreenshot(image.url, player);
-      await finishVerification(message.author.id, result.valid, result.reason || 'Проверка изображения не пройдена.');
-      if (!result.valid) {
-        await message.react('❌').catch(() => {});
-        return message.reply('❌ **Верификация не пройдена.**\\n' + (result.reason || 'Бот не смог уверенно прочитать ник и ID на скриншоте.') + '\\nПроверь, что это профиль Standoff 2 и на одном скрине хорошо видны **ник и ID**.');
+      console.log('[DOMINION] Verification screenshot received:', {
+        user: message.author.id,
+        attachments: message.attachments.size,
+        hasImage: Boolean(image)
+      });
+      if (!image) {
+        return message.reply('⚠️ Я вижу сообщение, но не смог определить вложение как изображение. Отправь скриншот как обычное изображение/файл ещё раз.');
       }
-      await message.react('✅').catch(() => {});
-      return message.reply('✅ **Профиль успешно верифицирован автоматически.**\\nНик и ID на скриншоте совпали с данными профиля DOMINION.');
+      const player = await getPlayer(message.author.id);
+      if (!player) return message.reply('❌ Профиль DOMINION не найден. Сначала создай профиль.');
+      await message.react('🔎').catch(() => {});
+      const status = await message.reply('🔎 **Проверяю скрин профиля Standoff 2...**\\nСчитываю ник и ID.');
+      try {
+        const result = await analyzeProfileVerificationScreenshot(image.url, player);
+        await finishVerification(message.author.id, result.valid, result.reason || 'Проверка изображения не пройдена.');
+        if (!result.valid) {
+          await message.react('❌').catch(() => {});
+          return status.edit('❌ **Верификация не пройдена.**\\n' + (result.reason || 'Бот не смог уверенно прочитать ник и ID на скриншоте.') + '\\nПроверь, что это профиль Standoff 2 и на одном скрине хорошо видны **ник и ID**.');
+        }
+        await message.react('✅').catch(() => {});
+        return status.edit('✅ **Профиль успешно верифицирован автоматически.**\\nНик и ID на скриншоте совпали с данными профиля DOMINION.');
+      } catch (error) {
+        console.error('[DOMINION] Profile verification error:', error);
+        return status.edit('⚠️ **Не удалось проверить скриншот.**\\nВерификация не изменена. Попробуй отправить скрин ещё раз.');
+      }
     }
 
     const games = await getReadyCustomGamesForPlayer(message.author.id);
