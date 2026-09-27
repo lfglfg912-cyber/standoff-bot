@@ -66,7 +66,8 @@ export async function analyzeCustomResultScreenshot(imageUrl, game) {
   const missing = expected.filter(nick => !detected.some(found => nickMatches(nick, found)));
   const team1Found = team1.filter(p => detected.some(found => nickMatches(p.nick, found)));
   const team2Found = team2.filter(p => detected.some(found => nickMatches(p.nick, found)));
-  const valid = Boolean(parsed.is_result_screen && parsed.confidence >= 0.85 && parsed.score_team1 !== parsed.score_team2 && missing.length === 0 && team1Found.length === team1.length && team2Found.length === team2.length && [1,2].includes(parsed.winner_team));
+  const scoreWinner = parsed.score_team1 > parsed.score_team2 ? 1 : parsed.score_team2 > parsed.score_team1 ? 2 : 0;
+  const valid = Boolean(parsed.is_result_screen && parsed.confidence >= 0.85 && scoreWinner === parsed.winner_team && missing.length === 0 && team1Found.length === team1.length && team2Found.length === team2.length);
   const result = { ...parsed, valid, missing_players: missing, matched_team1: team1Found.map(x => x.nick), matched_team2: team2Found.map(x => x.nick) };
   await query('INSERT INTO ai_logs (discord_id, prompt, response) VALUES ($1, $2, $3)', [null, 'custom-result #' + game.id + ' screenshot', JSON.stringify(result)]);
   return result;
