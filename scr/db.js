@@ -161,6 +161,22 @@ export async function getTournamentPlayers(tournamentId) {
   return rows;
 }
 
+export async function getTournamentMatches(tournamentId) {
+  const { rows } = await query(`
+    SELECT m.*,
+      p1.standoff_nick AS player1_nick,
+      p2.standoff_nick AS player2_nick,
+      pw.standoff_nick AS winner_nick
+    FROM matches m
+    LEFT JOIN players p1 ON p1.discord_id = m.player1_id
+    LEFT JOIN players p2 ON p2.discord_id = m.player2_id
+    LEFT JOIN players pw ON pw.discord_id = m.winner_id
+    WHERE m.tournament_id = $1
+    ORDER BY m.round, m.match_no
+  `, [tournamentId]);
+  return rows;
+}
+
 export async function startTournament(tournamentId) {
   const client = await pool.connect();
   try {
@@ -184,6 +200,11 @@ export async function startTournament(tournamentId) {
         VALUES ($1, $2, $3, $4, $5)
       `, [tournamentId, round, i / 2 + 1, shuffled[i].discord_id, shuffled[i + 1].discord_id]);
     }
+
+    await client.query(
+      'UPDATE players SET tournaments = tournaments + 1, updated_at = NOW() WHERE discord_id IN (SELECT discord_id FROM tournament_players WHERE tournament_id = $1)',
+      [tournamentId]
+    );
     await client.query("UPDATE tournaments SET status = 'running', started_at = NOW() WHERE id = $1", [tournamentId]);
     await client.query('COMMIT');
     return true;
@@ -232,8 +253,9 @@ export async function reportMatch(matchId, reporterId, winnerId) {
     await client.query('UPDATE players SET losses = losses + 1, rating = GREATEST(0, rating - 10), updated_at = NOW() WHERE discord_id = $1', [loserId]);
 
     const pending = await client.query(`
-      SELECT * FROM matches WHERE tournament_id = $1 AND round = $2 AND status = 'pending'
+      SELECT 1 FROM matches WHERE tournament_id = $1 AND round = $2 AND status = 'pending'
     `, [match.tournament_id, match.round]);
+
     if (pending.rows.length === 0) {
       const roundMatches = await client.query(`SELECT * FROM matches WHERE tournament_id = $1 AND round = $2 ORDER BY match_no`, [match.tournament_id, match.round]);
       const winners = roundMatches.rows.map(m => m.winner_id).filter(Boolean);
