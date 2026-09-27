@@ -72,3 +72,41 @@ export async function analyzeCustomResultScreenshot(imageUrl, game) {
   await query('INSERT INTO ai_logs (discord_id, prompt, response) VALUES ($1, $2, $3)', [null, 'custom-result #' + game.id + ' screenshot', JSON.stringify(result)]);
   return result;
 }
+
+export async function analyzeProfileVerificationScreenshot(imageUrl, player) {
+  if (!client) throw new Error('AI_NOT_CONFIGURED');
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      is_standoff_profile: { type: 'boolean' },
+      detected_nick: { type: 'string' },
+      detected_id: { type: 'string' },
+      nick_match: { type: 'boolean' },
+      id_match: { type: 'boolean' },
+      readable: { type: 'boolean' },
+      confidence: { type: 'number', minimum: 0, maximum: 1 },
+      reason: { type: 'string' }
+    },
+    required: ['is_standoff_profile','detected_nick','detected_id','nick_match','id_match','readable','confidence','reason']
+  };
+  const response = await client.responses.create({
+    model: process.env.OPENAI_VISION_MODEL || process.env.OPENAI_MODEL || 'gpt-5.6-luna',
+    instructions: 'Ты проверяешь скриншот профиля Standoff 2 для верификации Discord-профиля DOMINION. Не угадывай. На изображении должен быть экран профиля игрока Standoff 2, где одновременно читаются ник и ID. Сравни их с данными пользователя. Не считай текст сообщения доказательством. Если данных не видно или изображение не похоже на профиль Standoff 2 — отклони. Не пытайся доказать владение аккаунтом по одному скриншоту; проверяй только визуальное совпадение профиля.',
+    input: [{ role: 'user', content: [
+      { type: 'input_text', text: 'Ожидаемый ник: ' + String(player.standoff_nick || '') + '\nОжидаемый ID: ' + String(player.standoff_id || '') + '\nПроверь изображение.' },
+      { type: 'input_image', image_url: imageUrl, detail: 'high' }
+    ] }],
+    text: { format: { type: 'json_schema', name: 'profile_verification_check', strict: true, schema } },
+    max_output_tokens: 500
+  });
+  const parsed = JSON.parse(response.output_text || '{}');
+  const nickOk = nickMatches(player.standoff_nick, parsed.detected_nick);
+  const idExpected = normalizeNick(player.standoff_id);
+  const idDetected = normalizeNick(parsed.detected_id);
+  const idOk = Boolean(idExpected && idDetected && (idExpected === idDetected || idDetected.includes(idExpected) || idExpected.includes(idDetected)));
+  const valid = Boolean(parsed.is_standoff_profile && parsed.readable && parsed.confidence >= 0.90 && nickOk && idOk && parsed.nick_match && parsed.id_match);
+  const result = { ...parsed, nick_match: nickOk, id_match: idOk, valid };
+  await query('INSERT INTO ai_logs (discord_id, prompt, response) VALUES ($1, $2, $3)', [null, 'profile-verification screenshot', JSON.stringify(result)]);
+  return result;
+}
