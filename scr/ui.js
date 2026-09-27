@@ -60,7 +60,7 @@ export function profileModal(player = null) {
     .setTitle('Профиль DOMINION')
     .addComponents(
       new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('nick').setLabel('Ник в Standoff 2').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(32).setValue(player?.standoff_nick || '')),
-      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('standoff_id').setLabel('ID игрока (необязательно)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(64).setValue(player?.standoff_id || ''))
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('standoff_id').setLabel('ID игрока Standoff 2').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(64).setValue(player?.standoff_id || ''))
     );
 }
 
