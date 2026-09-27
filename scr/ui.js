@@ -103,9 +103,10 @@ export function teamRegistrationModal(tournamentId, teamSize) {
   );
 }
 
-export function vetoButtons(match, bans) {
+export function vetoButtons(match, bans, votes = []) {
   const pool = match.map_pool?.length ? match.map_pool : [];
   const banned = new Set(bans.map(x => x.map_name));
+  const counts = new Map(votes.map(x => [x.map_name, x.votes]));
   const rows = [];
   let row = new ActionRowBuilder();
   for (const map of pool) {
@@ -114,7 +115,13 @@ export function vetoButtons(match, bans) {
       rows.push(row);
       row = new ActionRowBuilder();
     }
-    row.addComponents(new ButtonBuilder().setCustomId(`veto:ban:${match.id}:${encodeURIComponent(map)}`).setLabel(`🚫 ${map}`).setStyle(ButtonStyle.Danger));
+    const count = counts.get(map) || 0;
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`veto:vote:${match.id}:${encodeURIComponent(map)}`)
+        .setLabel(`🗳️ ${map}${count ? ` · ${count}` : ''}`)
+        .setStyle(ButtonStyle.Danger)
+    );
   }
   if (row.components.length) rows.push(row);
   return rows;
