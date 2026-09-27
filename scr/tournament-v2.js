@@ -130,8 +130,7 @@ export async function getTeamMembers(teamId) {
 }
 
 function extractIds(raw) {
-  return raw.split(/[,
-; ]+/).map(v => v.trim().replace(/^<@!?(d+)>$/, '$1')).filter(Boolean);
+  return raw.split(/[,;\\s]+/).map(v => v.trim().replace(/^<@!?(\\d+)>$/, '$1')).filter(Boolean);
 }
 
 export async function registerTournamentTeam(tournamentId, captainId, teamName, rawMemberIds) {
