@@ -537,3 +537,11 @@ export async function listCustomGamesForPlayer(discordId) {
   );
   return rows;
 }
+
+export async function getReadyCustomGamesForPlayer(discordId) {
+  const { rows } = await query(
+    'SELECT * FROM custom_matches WHERE status = $1 AND veto_status = $2 AND ($3 = ANY(team1_ids) OR $3 = ANY(team2_ids)) ORDER BY created_at DESC LIMIT 10',
+    ['active', 'finished', discordId]
+  );
+  return rows;
+}
