@@ -68,6 +68,15 @@ export async function initDb() {
       UNIQUE (tournament_id, round, match_no)
     );
 
+    CREATE TABLE IF NOT EXISTS verification_requests (
+      discord_id TEXT PRIMARY KEY REFERENCES players(discord_id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_reason TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS ai_logs (
       id BIGSERIAL PRIMARY KEY,
       discord_id TEXT,
@@ -279,4 +288,31 @@ export async function reportMatch(matchId, reporterId, winnerId) {
   } finally {
     client.release();
   }
+}
+
+
+export async function startVerification(discordId) {
+  await query(`
+    INSERT INTO verification_requests (discord_id, status, attempts, last_reason, updated_at)
+    VALUES ($1, 'pending', 0, NULL, NOW())
+    ON CONFLICT (discord_id) DO UPDATE SET
+      status = 'pending',
+      attempts = verification_requests.attempts,
+      last_reason = NULL,
+      updated_at = NOW()
+  `, [discordId]);
+  return true;
+}
+
+export async function getVerificationRequest(discordId) {
+  const { rows } = await query('SELECT * FROM verification_requests WHERE discord_id = $1', [discordId]);
+  return rows[0] ?? null;
+}
+
+export async function finishVerification(discordId, verified, reason = '') {
+  await query('UPDATE verification_requests SET status = $2, attempts = attempts + 1, last_reason = $3, updated_at = NOW() WHERE discord_id = $1', [discordId, verified ? 'verified' : 'rejected', reason]);
+  if (verified) {
+    await query('UPDATE players SET verified = TRUE, updated_at = NOW() WHERE discord_id = $1', [discordId]);
+  }
+  return true;
 }
