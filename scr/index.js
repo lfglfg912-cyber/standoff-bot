@@ -7,7 +7,8 @@ import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joi
 import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customGameModal, customGameButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
-import { aiEnabled, askAI, analyzeCustomResultScreenshot } from './ai.js';
+import { aiEnabled, askAI } from './ai.js';
+import { analyzeCustomResultScreenshotOCR } from './ocr.js';
 
 const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_GUILD_ID', 'PANEL_CHANNEL_ID', 'ADMIN_ROLE_ID'];
 for (const key of required) if (!process.env[key]) throw new Error(`Missing environment variable: ${key}`);
@@ -72,7 +73,7 @@ client.on(Events.MessageCreate, async message => {
     else if (games.length === 1) game = games[0];
     if (!game) return message.reply('📸 Скрин получен. У тебя несколько активных кастомов. Укажи номер матча, например **#12**, чтобы бот проверил именно его.');
     await message.react('🔎').catch(() => {});
-    const result = await analyzeCustomResultScreenshot(image.url, game);
+    const result = await analyzeCustomResultScreenshotOCR(image.url, game);
     if (!result.valid) {
       await message.react('❌').catch(() => {});
       return message.reply({ content: '❌ **Результат не подтверждён.**\nБот не смог надёжно подтвердить скриншот: нужен экран результата Standoff 2, читаемый счёт и все игроки этого кастома. **Рейтинг не изменён.**' + (result.missing_players?.length ? '\nНе распознаны: ' + result.missing_players.join(', ') : '') });
