@@ -4,8 +4,9 @@ import {
   REST, Routes
 } from 'discord.js';
 import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileEmbed, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, resultButtons } from './ui.js';
+import { mainPanel, profileEmbed, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
+import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, banMap, reportMatchV2, getTournamentV2, TEAM_FORMATS } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
 
 const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_GUILD_ID', 'PANEL_CHANNEL_ID', 'ADMIN_ROLE_ID'];
@@ -42,6 +43,7 @@ client.once(Events.ClientReady, async ready => {
   console.log(`[DOMINION] Logged in as ${ready.user.tag}`);
   try {
     await initDb();
+    await initTournamentV2Db();
     const channel = await ready.channels.fetch(process.env.PANEL_CHANNEL_ID);
     if (!channel?.isTextBased()) throw new Error('PANEL_CHANNEL_ID is not a text channel');
     await sendMainPanel(channel);
@@ -69,7 +71,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (scope === 'nav') {
         if (action === 'profile') return showProfile(interaction);
         if (action === 'tournaments') {
-          const ts = await listTournaments();
+          const ts = await listTournamentsV2();
           return interaction.reply({ embeds: [tournamentsEmbed(ts)], components: tournamentButtons(ts), ephemeral: true });
         }
         if (action === 'matches') return interaction.reply({ ...(await matchesEmbed(interaction.user.id)), ephemeral: true });
@@ -99,9 +101,17 @@ client.on(Events.InteractionCreate, async interaction => {
           await joinTournament(id, interaction.user.id);
           return interaction.update(await tournamentView(id));
         }
+        if (action === 'team') {
+          const t = await getTournamentV2(id);
+          if (!t) return interaction.reply({ content: 'Турнир не найден.', ephemeral: true });
+          const size = TEAM_FORMATS[t.format || '1v1'];
+          if (!size || size <= 1) return interaction.reply({ content: 'Для этого турнира нужна обычная регистрация.', ephemeral: true });
+          if (!await getPlayer(interaction.user.id)) return interaction.reply({ content: 'Сначала создай профиль через 👤 Профиль.', ephemeral: true });
+          return interaction.showModal(teamRegistrationModal(id, size));
+        }
         if (action === 'start') {
           if (!isAdmin(interaction)) return interaction.reply({ content: 'Запустить турнир может только администрация.', ephemeral: true });
-          await startTournament(id);
+          await startTournamentV2(id);
           return interaction.update(await tournamentView(id));
         }
       }
@@ -111,11 +121,19 @@ client.on(Events.InteractionCreate, async interaction => {
         return interaction.showModal(tournamentCreateModal());
       }
 
+      if (scope === 'veto' && action === 'ban') {
+        const mapName = decodeURIComponent(extra || '');
+        await banMap(id, interaction.user.id, mapName);
+        return interaction.update(await tournamentView((await getTournamentV2(id)).id));
+      }
+
       if (scope === 'match' && action === 'win') {
         const matchId = id;
-        const winnerId = extra;
-        await reportMatch(matchId, interaction.user.id, winnerId);
-        return interaction.reply({ content: '✅ Результат сохранён. Следующий раунд будет создан автоматически, когда завершатся остальные матчи раунда.', ephemeral: true });
+        const winnerType = extra;
+        const winnerValue = interaction.customId.split(':')[4];
+        if (winnerType === 'team') await reportMatchV2(matchId, interaction.user.id, null, winnerValue);
+        else await reportMatchV2(matchId, interaction.user.id, winnerValue, null);
+        return interaction.reply({ content: '✅ Результат сохранён. Следующий раунд создастся автоматически после завершения раунда.', ephemeral: true });
       }
     }
 
@@ -133,14 +151,23 @@ client.on(Events.InteractionCreate, async interaction => {
         const answer = await askAI(interaction.user.id, prompt);
         return interaction.editReply({ embeds: [new EmbedBuilder().setTitle('🤖 DOMINION AI').setDescription(answer).setColor(0x8b0000)] });
       }
+      if (interaction.customId.startsWith('team:register:')) {
+        const tournamentId = interaction.customId.split(':')[2];
+        const teamName = interaction.fields.getTextInputValue('team_name').trim();
+        const members = interaction.fields.getTextInputValue('members').trim();
+        await registerTournamentTeam(tournamentId, interaction.user.id, teamName, members);
+        return interaction.reply({ content: `✅ Команда **${teamName}** зарегистрирована. Капитан: <@${interaction.user.id}>.`, ephemeral: true });
+      }
+
       if (interaction.customId === 'admin:create_tournament_modal') {
         if (!isAdmin(interaction)) return interaction.reply({ content: 'Недостаточно прав.', ephemeral: true });
         const name = interaction.fields.getTextInputValue('name').trim();
+        const format = interaction.fields.getTextInputValue('format').trim().toLowerCase();
         const slots = Number(interaction.fields.getTextInputValue('slots').trim());
         const prize = Number(interaction.fields.getTextInputValue('prize').trim());
-        if (![4, 8, 16, 32].includes(slots) || !Number.isInteger(prize) || prize < 0) return interaction.reply({ content: 'Проверь слоты и призовой фонд.', ephemeral: true });
-        const t = await createTournament({ name, slots, prizeGold: prize, createdBy: interaction.user.id });
-        return interaction.reply({ content: `✅ Турнир **${t.name}** создан (#${t.id}). Открой «🏆 Турниры».`, ephemeral: true });
+        if (!TEAM_FORMATS[format] || ![4, 8, 16, 32].includes(slots) || !Number.isInteger(prize) || prize < 0) return interaction.reply({ content: 'Формат: 1v1/2v2/3v3/4v4/5v5. Слоты: 4/8/16/32. Приз — целое число.', ephemeral: true });
+        const t = await createTournamentV2({ name, format, slots, prizeGold: prize, createdBy: interaction.user.id });
+        return interaction.reply({ content: `✅ Турнир **${t.name}** создан (#${t.id}) в формате **${format}**.`, ephemeral: true });
       }
     }
   } catch (error) {
@@ -150,6 +177,15 @@ client.on(Events.InteractionCreate, async interaction => {
       : error.message === 'REGISTRATION_CLOSED' ? 'Регистрация уже закрыта.'
       : error.message === 'MATCH_ALREADY_DONE' ? 'Этот матч уже завершён.'
       : error.message === 'NOT_A_PLAYER' ? 'Ты не участник этого матча.'
+      : error.message === 'NOT_CAPTAIN' ? 'Бан карты может делать только капитан команды.'
+      : error.message === 'NOT_YOUR_TURN' ? 'Сейчас ход другой стороны.'
+      : error.message === 'VETO_NOT_FINISHED' ? 'Сначала завершите бан карт.'
+      : error.message === 'MAP_ALREADY_BANNED' ? 'Эта карта уже забанена.'
+      : error.message === 'TEAM_MEMBER_PROFILE_MISSING' ? 'У всех участников должен быть профиль DOMINION.'
+      : error.message === 'TEAM_MEMBER_ALREADY_REGISTERED' ? 'Один из участников уже зарегистрирован в другой команде этого турнира.'
+      : error.message === 'TEAM_NAME_OR_MEMBER_DUPLICATE' ? 'Такое название команды уже занято или участник указан дважды.'
+      : error.message === 'SOLO_TOURNAMENT' ? 'Для 1v1 используется обычная регистрация.'
+      : typeof error.message === 'string' && error.message.startsWith('NEED_TEAM_SIZE:') ? `Для этого формата нужно ровно ${error.message.split(':')[1]} игроков в команде.`
       : typeof error.message === 'string' && error.message.startsWith('NEED_EXACT_SLOTS:') ? `Нужно ровно ${error.message.split(':')[1]} участников.`
       : 'Произошла ошибка. Проверь логи бота.';
     if (interaction.replied || interaction.deferred) await interaction.followUp({ content: message, ephemeral: true }).catch(() => {});
