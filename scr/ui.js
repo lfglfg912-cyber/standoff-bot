@@ -4,6 +4,8 @@ import {
 } from 'discord.js';
 import sharp from 'sharp';
 
+// DOMINION UI: current production-safe UI module.
+
 export function mainPanel() {
   const embed = new EmbedBuilder()
     .setTitle('⚔️ DOMINION | STANDOFF 2')
@@ -20,7 +22,6 @@ export function mainPanel() {
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('nav:profile').setLabel('👤 Профиль').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('nav:tournaments').setLabel('🏆 Турниры').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Кастом').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Кастом').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('nav:matches').setLabel('🎮 Мои матчи').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('nav:ai').setLabel('🤖 AI-помощник').setStyle(ButtonStyle.Success)
