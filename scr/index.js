@@ -72,7 +72,7 @@ client.on(Events.InteractionCreate, async interaction => {
           const ts = await listTournaments();
           return interaction.reply({ embeds: [tournamentsEmbed(ts)], components: tournamentButtons(ts), ephemeral: true });
         }
-        if (action === 'matches') return interaction.reply({ embeds: [await matchesEmbed(interaction.user.id)], ephemeral: true });
+        if (action === 'matches') return interaction.reply({ ...(await matchesEmbed(interaction.user.id)), ephemeral: true });
         if (action === 'ai') {
           if (!aiEnabled()) return interaction.reply({ content: '🤖 AI пока не подключён. Администратору нужно добавить OPENAI_API_KEY.', ephemeral: true });
           return interaction.showModal(aiModal());
@@ -149,7 +149,7 @@ client.on(Events.InteractionCreate, async interaction => {
       : error.message === 'REGISTRATION_CLOSED' ? 'Регистрация уже закрыта.'
       : error.message === 'MATCH_ALREADY_DONE' ? 'Этот матч уже завершён.'
       : error.message === 'NOT_A_PLAYER' ? 'Ты не участник этого матча.'
-      : error.message.startsWith('NEED_EXACT_SLOTS:') ? `Нужно ровно ${error.message.split(':')[1]} участников.`
+      : typeof error.message === 'string' && error.message.startsWith('NEED_EXACT_SLOTS:') ? `Нужно ровно ${error.message.split(':')[1]} участников.`
       : 'Произошла ошибка. Проверь логи бота.';
     if (interaction.replied || interaction.deferred) await interaction.followUp({ content: message, ephemeral: true }).catch(() => {});
     else await interaction.reply({ content: message, ephemeral: true }).catch(() => {});
