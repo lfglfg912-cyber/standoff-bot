@@ -127,9 +127,3 @@ export function resultButtons(match) {
       : `match:win:${match.id}:player:${match.player2_id}`).setLabel(isTeam ? '🏆 Победила команда 2' : '🏆 Победил игрок 2').setStyle(ButtonStyle.Success)
   )];
 }
-export function resultButtons(match) {
-  return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`match:win:${match.id}:${match.player1_id}`).setLabel('🏆 Победил игрок 1').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`match:win:${match.id}:${match.player2_id}`).setLabel('🏆 Победил игрок 2').setStyle(ButtonStyle.Success)
-  )];
-}
