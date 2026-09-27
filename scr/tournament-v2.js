@@ -531,3 +531,11 @@ export async function reportCustomGame(matchId, reporterId, winnerTeam) {
     db.release();
   }
 }
+
+export async function listCustomGamesForPlayer(discordId) {
+  const { rows } = await query(
+    'SELECT * FROM custom_matches WHERE status <> $1 AND ($2 = ANY(team1_ids) OR $2 = ANY(team2_ids)) ORDER BY created_at DESC LIMIT 10',
+    ['completed', discordId]
+  );
+  return rows;
+}
