@@ -10,6 +10,7 @@ export async function initTournamentV2Db() {
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS veto_step INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS veto_status TEXT NOT NULL DEFAULT 'pending';
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS selected_map TEXT;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS veto_round INTEGER NOT NULL DEFAULT 1;
 
     CREATE TABLE IF NOT EXISTS tournament_teams (
       id BIGSERIAL PRIMARY KEY,
@@ -31,12 +32,22 @@ export async function initTournamentV2Db() {
       id BIGSERIAL PRIMARY KEY,
       match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
       step INTEGER NOT NULL,
-      team_id BIGINT NOT NULL REFERENCES tournament_teams(id) ON DELETE CASCADE,
+      team_id BIGINT REFERENCES tournament_teams(id) ON DELETE CASCADE,
       action TEXT NOT NULL DEFAULT 'ban',
       map_name TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (match_id, step),
       UNIQUE (match_id, map_name)
+    );
+
+    CREATE TABLE IF NOT EXISTS match_map_votes (
+      id BIGSERIAL PRIMARY KEY,
+      match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      discord_id TEXT NOT NULL REFERENCES players(discord_id) ON DELETE CASCADE,
+      veto_round INTEGER NOT NULL,
+      map_name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (match_id, discord_id, veto_round)
     );
   `);
 }
@@ -265,15 +276,30 @@ export async function getPlayerOrCaptainMatches(discordId) {
   return rows;
 }
 
+export async function getMatchParticipantsFromClient(client, match) {
+  if (match.team1_id && match.team2_id) {
+    const r = await client.query('SELECT discord_id FROM tournament_team_members WHERE team_id = ANY($1::bigint[]) ORDER BY joined_at', [[match.team1_id, match.team2_id]]);
+    return r.rows.map(x => x.discord_id);
+  }
+  return [match.player1_id, match.player2_id].filter(Boolean);
+}
+
 export async function getVetoState(matchId) {
   const { rows } = await query('SELECT * FROM matches WHERE id = $1', [matchId]);
   if (!rows[0]) throw new Error('MATCH_NOT_FOUND');
   const match = rows[0];
   const bans = await query('SELECT * FROM match_map_veto WHERE match_id = $1 ORDER BY step', [matchId]);
-  return { match, bans: bans.rows };
+  const votes = await query('SELECT map_name, COUNT(*)::int AS votes FROM match_map_votes WHERE match_id = $1 AND veto_round = $2 GROUP BY map_name ORDER BY votes DESC, map_name', [matchId, match.veto_round || 1]);
+  const participants = await query(`SELECT COUNT(*)::int AS count FROM (
+      SELECT discord_id FROM tournament_team_members WHERE team_id = $1
+      UNION SELECT discord_id FROM tournament_team_members WHERE team_id = $2
+      UNION SELECT $3::text AS discord_id UNION SELECT $4::text AS discord_id
+    ) p WHERE discord_id IS NOT NULL`, [match.team1_id, match.team2_id, match.player1_id, match.player2_id]);
+  const votedPlayers = await query('SELECT discord_id, map_name FROM match_map_votes WHERE match_id = $1 AND veto_round = $2', [matchId, match.veto_round || 1]);
+  return { match, bans: bans.rows, votes: votes.rows, participants: participants.rows[0]?.count || 0, votedPlayers: votedPlayers.rows };
 }
 
-export async function banMap(matchId, discordId, mapName) {
+export async function castMapVote(matchId, discordId, mapName) {
   const client = await (await import('./db.js')).pool.connect();
   try {
     await client.query('BEGIN');
@@ -281,47 +307,38 @@ export async function banMap(matchId, discordId, mapName) {
     const m = r.rows[0];
     if (!m) throw new Error('MATCH_NOT_FOUND');
     if (m.veto_status !== 'active') throw new Error('VETO_FINISHED');
-
-    const isTeam = Boolean(m.team1_id && m.team2_id);
-    let teamId = null;
-    if (isTeam) {
-      const teams = await client.query('SELECT id, captain_id FROM tournament_teams WHERE id = ANY($1::bigint[])', [[m.team1_id, m.team2_id]]);
-      const captain = teams.rows.find(t => t.captain_id === discordId);
-      if (!captain) throw new Error('NOT_CAPTAIN');
-      teamId = Number(captain.id);
-    } else {
-      if (![m.player1_id, m.player2_id].includes(discordId)) throw new Error('NOT_A_PLAYER');
-      teamId = discordId === m.player1_id ? m.player1_id : m.player2_id;
-    }
-
-    const current = await client.query('SELECT COUNT(*)::int AS count FROM match_map_veto WHERE match_id = $1', [matchId]);
-    const step = current.rows[0].count;
-    const expectedTeam = step % 2 === 0 ? m.team1_id || m.player1_id : m.team2_id || m.player2_id;
-    if (String(expectedTeam) !== String(teamId)) throw new Error('NOT_YOUR_TURN');
-    if (!MAP_POOL.includes(mapName)) throw new Error('INVALID_MAP');
+    const participants = await getMatchParticipantsFromClient(client, m);
+    if (!participants.includes(discordId)) throw new Error('NOT_A_PLAYER');
     const pool = m.map_pool?.length ? m.map_pool : MAP_POOL;
     if (!pool.includes(mapName)) throw new Error('INVALID_MAP');
-    const already = await client.query('SELECT 1 FROM match_map_veto WHERE match_id = $1 AND map_name = $2', [matchId, mapName]);
-    if (already.rows.length) throw new Error('MAP_ALREADY_BANNED');
-
-    await client.query('INSERT INTO match_map_veto (match_id, step, team_id, action, map_name) VALUES ($1,$2,$3,$4,$5)', [matchId, step, isTeam ? teamId : null, 'ban', mapName]);
-
-    const nextStep = step + 1;
-    if (nextStep >= pool.length - 1) {
-      const banned = await client.query('SELECT map_name FROM match_map_veto WHERE match_id = $1', [matchId]);
-      const remaining = pool.find(x => !banned.rows.some(b => b.map_name === x));
-      await client.query('UPDATE matches SET veto_step = $1, veto_status = \'finished\', selected_map = $2 WHERE id = $3', [nextStep, remaining, matchId]);
-    } else {
-      await client.query('UPDATE matches SET veto_step = $1 WHERE id = $2', [nextStep, matchId]);
+    const banned = await client.query('SELECT map_name FROM match_map_veto WHERE match_id = $1', [matchId]);
+    const remaining = pool.filter(x => !banned.rows.some(b => b.map_name === x));
+    if (!remaining.includes(mapName)) throw new Error('MAP_ALREADY_BANNED');
+    const round = m.veto_round || 1;
+    const existing = await client.query('SELECT 1 FROM match_map_votes WHERE match_id=$1 AND discord_id=$2 AND veto_round=$3', [matchId, discordId, round]);
+    if (existing.rows.length) throw new Error('ALREADY_VOTED');
+    await client.query('INSERT INTO match_map_votes (match_id, discord_id, veto_round, map_name) VALUES ($1,$2,$3,$4)', [matchId, discordId, round, mapName]);
+    const counts = await client.query('SELECT map_name, COUNT(*)::int AS votes FROM match_map_votes WHERE match_id=$1 AND veto_round=$2 GROUP BY map_name ORDER BY votes DESC, map_name', [matchId, round]);
+    const majority = Math.floor(participants.length / 2) + 1;
+    const totalVotes = counts.rows.reduce((sum, x) => sum + x.votes, 0);
+    let bannedMap = counts.rows.find(x => x.votes >= majority)?.map_name;
+    if (!bannedMap && totalVotes >= participants.length) {
+      const ranked = counts.rows.slice().sort((a,b) => b.votes - a.votes || pool.indexOf(a.map_name) - pool.indexOf(b.map_name));
+      bannedMap = ranked[0]?.map_name;
+    }
+    if (bannedMap) {
+      const stepRes = await client.query('SELECT COUNT(*)::int AS count FROM match_map_veto WHERE match_id=$1', [matchId]);
+      const step = stepRes.rows[0].count;
+      await client.query('INSERT INTO match_map_veto (match_id, step, team_id, action, map_name) VALUES ($1,$2,NULL,$3,$4)', [matchId, step, 'vote-ban', bannedMap]);
+      const newRemaining = remaining.filter(x => x !== bannedMap);
+      if (newRemaining.length === 1) await client.query("UPDATE matches SET veto_step=$1, veto_round=$2, veto_status='finished', selected_map=$3 WHERE id=$4", [step + 1, round + 1, newRemaining[0], matchId]);
+      else await client.query('UPDATE matches SET veto_step=$1, veto_round=$2 WHERE id=$3', [step + 1, round + 1, matchId]);
+      await client.query('DELETE FROM match_map_votes WHERE match_id=$1 AND veto_round=$2', [matchId, round]);
     }
     await client.query('COMMIT');
     return getVetoState(matchId);
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  } catch (error) { await client.query('ROLLBACK'); throw error; }
+  finally { client.release(); }
 }
 
 export async function reportMatchV2(matchId, reporterId, winnerId, winnerTeamId = null) {
