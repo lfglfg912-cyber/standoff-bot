@@ -150,7 +150,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const sid = interaction.fields.getTextInputValue('standoff_id').trim();
         if (!sid) return interaction.reply({ content: '❌ ID игрока Standoff 2 обязателен.', ephemeral: true });
         const player = await upsertPlayer(interaction.user.id, nick, sid);
-        return interaction.reply({ embeds: [profileEmbed(player, interaction.user)], components: profileButtons(), ephemeral: true });
+        return interaction.reply({ ...(await profileCard(player, interaction.user)), ephemeral: true });
       }
       if (interaction.customId === 'ai:ask') {
         await interaction.deferReply({ ephemeral: true });
