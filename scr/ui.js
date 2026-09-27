@@ -164,21 +164,6 @@ export function customGameButtons(game) {
   return rows;
 }
 
-export function customGameModal() {
-  return new ModalBuilder().setCustomId('custom:create').setTitle('⚔️ Кастомная игра на звание').addComponents(
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('format').setLabel('Формат: 1v1 / 2v2 / 3v3 / 4v4 / 5v5').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('team1').setLabel('Команда 1: Discord ID через запятую').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('team2').setLabel('Команда 2: Discord ID через запятую').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400))
-  );
-}
-
-export function customGameButtons(game) {
-  const rows = [];
-  if (game?.veto_status === 'active') rows.push(...vetoButtons(game, game.bans || [], game.votes || [], 'custom'));
-  if (game?.veto_status === 'finished') rows.push(...resultButtons(game));
-  return rows;
-}
-
 export function customResultButtons(game) {
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`custom:win:${game.id}:team:1`).setLabel('🏆 Победила команда 1').setStyle(ButtonStyle.Success),
