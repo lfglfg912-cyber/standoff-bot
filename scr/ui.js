@@ -91,7 +91,9 @@ export async function profileCard(player, discordUser) {
 
   const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
   const attachment = new AttachmentBuilder(buffer, { name: 'dominion-profile.png' });
-  const embed = new EmbedBuilder().setColor(0x8b0000).setImage('attachment://dominion-profile.png')
+  const embed = new EmbedBuilder().setColor(0x8b0000)
+    .setThumbnail(discordUser.displayAvatarURL({ extension: 'png', size: 256 }))
+    .setImage('attachment://dominion-profile.png')
     .setFooter({ text: 'DOMINION · Skill. Discipline. Domination.' });
   return { embeds: [embed], files: [attachment], components: profileButtons() };
 }
