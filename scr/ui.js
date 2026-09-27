@@ -89,10 +89,24 @@ export async function profileCard(player, discordUser) {
     '<text x="760" y="584" fill="#fff" font-size="18" font-family="DejaVu Sans">' + rank + '</text>' +
     '</svg>';
 
-  const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
+  const avatarUrl = discordUser.displayAvatarURL({ extension: 'png', size: 256 });
+  let avatarData = '';
+  try {
+    const response = await fetch(avatarUrl);
+    if (response.ok) {
+      const avatarBuffer = Buffer.from(await response.arrayBuffer());
+      avatarData = `data:image/png;base64,${avatarBuffer.toString('base64')}`;
+    }
+  } catch (error) {
+    console.warn('[DOMINION] Could not load Discord avatar:', error.message);
+  }
+
+  const avatarSvg = avatarData ?
+    `<defs><clipPath id="avatarClip"><circle cx="205" cy="255" r="64"/></clipPath></defs><image href="${avatarData}" x="141" y="191" width="128" height="128" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatarClip)"/>` : '';
+  const finalSvg = svg.replace('</svg>', avatarSvg + '</svg>');
+  const buffer = await sharp(Buffer.from(finalSvg)).png().toBuffer();
   const attachment = new AttachmentBuilder(buffer, { name: 'dominion-profile.png' });
   const embed = new EmbedBuilder().setColor(0x8b0000)
-    .setThumbnail(discordUser.displayAvatarURL({ extension: 'png', size: 256 }))
     .setImage('attachment://dominion-profile.png')
     .setFooter({ text: 'DOMINION · Skill. Discipline. Domination.' });
   return { embeds: [embed], files: [attachment], components: profileButtons() };
