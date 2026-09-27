@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "DOMINION — Discord tournament platform for Standoff 2",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "start": "node scr/index.js",
     "dev": "node --watch scr/index.js",
@@ -15,6 +17,7 @@
     "dotenv": "^17.2.2",
     "openai": "^5.19.1",
     "pg": "^8.16.3",
-    "sharp": "^0.34.3"
+    "sharp": "^0.34.3",
+    "tesseract.js": "^6.0.1"
   }
 }
