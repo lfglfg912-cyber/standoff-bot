@@ -166,10 +166,10 @@ export function customGameModal() {
       new TextInputBuilder().setCustomId('format').setLabel('Формат: 1v1 / 2v2 / 3v3 / 4v4 / 5v5').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)
     ),
     new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('team1').setLabel('Команда 1: Discord ID через запятую').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400)
+      new TextInputBuilder().setCustomId('team1').setLabel('Команда 1 — ID игроков').setStyle(TextInputStyle.Short).setPlaceholder('ID через пробел или запятую').setRequired(true).setMaxLength(100)
     ),
     new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('team2').setLabel('Команда 2: Discord ID через запятую').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400)
+      new TextInputBuilder().setCustomId('team2').setLabel('Команда 2 — ID игроков').setStyle(TextInputStyle.Short).setPlaceholder('ID через пробел или запятую').setRequired(true).setMaxLength(100)
     )
   );
 }
