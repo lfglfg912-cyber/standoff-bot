@@ -10,7 +10,7 @@ export function aiEnabled() {
 export async function askAI(userId, prompt) {
   if (!client) return 'ИИ-помощник пока не подключён администратором.';
   const response = await client.responses.create({
-    model: process.env.OPENAI_MODEL || 'gpt-5',
+    model: process.env.OPENAI_MODEL || 'gpt-5.6-luna',
     instructions: `Ты — официальный AI-помощник Discord-проекта DOMINION | STANDOFF 2. Отвечай по-русски, кратко и понятно. Ты помогаешь с правилами турниров, навигацией, профилями, матчами и организацией. Не выдумывай результаты матчей, не меняй рейтинг, не назначай призы и не принимай окончательные решения по спорным ситуациям. Если данных нет — прямо скажи об этом.`,
     input: prompt,
     max_output_tokens: 500
