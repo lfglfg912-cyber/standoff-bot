@@ -11,8 +11,6 @@ export async function initTournamentV2Db() {
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS veto_status TEXT NOT NULL DEFAULT 'pending';
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS selected_map TEXT;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS veto_round INTEGER NOT NULL DEFAULT 1;
-    ALTER TABLE match_map_veto ALTER COLUMN team_id DROP NOT NULL;
-
     CREATE TABLE IF NOT EXISTS tournament_teams (
       id BIGSERIAL PRIMARY KEY,
       tournament_id BIGINT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
