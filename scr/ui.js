@@ -252,14 +252,14 @@ export function vetoButtons(match, bans, votes = [], scope = 'veto') {
   return rows;
 }
 
-export function resultButtons(match) {
+export function resultButtons(match, scope = 'match') {
   const isTeam = Boolean(match.team1_id && match.team2_id);
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(isTeam
-      ? `match:win:${match.id}:team:${match.team1_id}`
+      ? `${scope}:win:${match.id}:team:${match.team1_id}`
       : `match:win:${match.id}:player:${match.player1_id}`).setLabel(isTeam ? '🏆 Победила команда 1' : '🏆 Победил игрок 1').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId(isTeam
-      ? `match:win:${match.id}:team:${match.team2_id}`
+      ? `${scope}:win:${match.id}:team:${match.team2_id}`
       : `match:win:${match.id}:player:${match.player2_id}`).setLabel(isTeam ? '🏆 Победила команда 2' : '🏆 Победил игрок 2').setStyle(ButtonStyle.Success)
   )];
 }
