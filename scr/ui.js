@@ -106,14 +106,18 @@ export function teamRegistrationModal(tournamentId, teamSize) {
 export function vetoButtons(match, bans) {
   const pool = match.map_pool?.length ? match.map_pool : [];
   const banned = new Set(bans.map(x => x.map_name));
-  const row = new ActionRowBuilder();
+  const rows = [];
+  let row = new ActionRowBuilder();
   for (const map of pool) {
-    if (!banned.has(map)) {
-      row.addComponents(new ButtonBuilder().setCustomId(`veto:ban:${match.id}:${encodeURIComponent(map)}`).setLabel(`🚫 ${map}`).setStyle(ButtonStyle.Danger));
+    if (banned.has(map)) continue;
+    if (row.components.length >= 5) {
+      rows.push(row);
+      row = new ActionRowBuilder();
     }
-    if (row.components.length >= 5) break;
+    row.addComponents(new ButtonBuilder().setCustomId(`veto:ban:${match.id}:${encodeURIComponent(map)}`).setLabel(`🚫 ${map}`).setStyle(ButtonStyle.Danger));
   }
-  return row.components.length ? [row] : [];
+  if (row.components.length) rows.push(row);
+  return rows;
 }
 
 export function resultButtons(match) {
