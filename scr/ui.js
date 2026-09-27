@@ -87,11 +87,46 @@ export function adminPanel() {
 export function tournamentCreateModal() {
   return new ModalBuilder().setCustomId('admin:create_tournament_modal').setTitle('Создать турнир').addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('name').setLabel('Название').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(60)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('slots').setLabel('Слоты: 4 / 8 / 16 / 32').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('format').setLabel('Формат: 1v1 / 2v2 / 3v3 / 4v4 / 5v5').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('slots').setLabel('Команд/участников: 4 / 8 / 16 / 32').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('prize').setLabel('Призовой фонд в Gold').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(8))
   );
 }
 
+export function teamRegistrationModal(tournamentId, teamSize) {
+  const help = teamSize === 2
+    ? 'ID напарника (Discord ID или @упоминание)'
+    : `ID ${teamSize - 1} участников через запятую`;
+  return new ModalBuilder().setCustomId(`team:register:${tournamentId}`).setTitle(`Регистрация команды ${teamSize}×${teamSize}`).addComponents(
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('team_name').setLabel('Название команды').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(32)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('members').setLabel(help).setStyle(TextInputStyle.Paragraph).setRequired(teamSize > 1).setMaxLength(400))
+  );
+}
+
+export function vetoButtons(match, bans) {
+  const pool = match.map_pool?.length ? match.map_pool : [];
+  const banned = new Set(bans.map(x => x.map_name));
+  const row = new ActionRowBuilder();
+  for (const map of pool) {
+    if (!banned.has(map)) {
+      row.addComponents(new ButtonBuilder().setCustomId(`veto:ban:${match.id}:${encodeURIComponent(map)}`).setLabel(`🚫 ${map}`).setStyle(ButtonStyle.Danger));
+    }
+    if (row.components.length >= 5) break;
+  }
+  return row.components.length ? [row] : [];
+}
+
+export function resultButtons(match) {
+  const isTeam = Boolean(match.team1_id && match.team2_id);
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(isTeam
+      ? `match:win:${match.id}:team:${match.team1_id}`
+      : `match:win:${match.id}:player:${match.player1_id}`).setLabel(isTeam ? '🏆 Победила команда 1' : '🏆 Победил игрок 1').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(isTeam
+      ? `match:win:${match.id}:team:${match.team2_id}`
+      : `match:win:${match.id}:player:${match.player2_id}`).setLabel(isTeam ? '🏆 Победила команда 2' : '🏆 Победил игрок 2').setStyle(ButtonStyle.Success)
+  )];
+}
 export function resultButtons(match) {
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`match:win:${match.id}:${match.player1_id}`).setLabel('🏆 Победил игрок 1').setStyle(ButtonStyle.Success),
