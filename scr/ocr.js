@@ -41,8 +41,8 @@ function nickMatches(expected, text) {
 function extractScore(text) {
   const source = String(text || '').replace(/[Oo]/g, '0').replace(/[Il]/g, '1');
   const patterns = [
-    /\\b(\\d{1,2})\\s*[:xX-]\\s*(\\d{1,2})\\b/g,
-    /\\b(\\d{1,2})\\s*[—–-]\\s*(\\d{1,2})\\b/g
+    /\b(\d{1,2})\\s*[:xX-]\\s*(\d{1,2})\b/g,
+    /\b(\d{1,2})\\s*[—–-]\\s*(\d{1,2})\b/g
   ];
   for (const re of patterns) {
     for (const m of source.matchAll(re)) {
