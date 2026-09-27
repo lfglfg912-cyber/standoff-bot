@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node scr/index.js",
     "dev": "node --watch scr/index.js",
-    "check": "node --check scr/index.js && node --check scr/db.js && node --check scr/ui.js && node --check scr/tournament.js && node --check scr/ai.js"
+    "check": "node --check scr/index.js && node --check scr/db.js && node --check scr/ui.js && node --check scr/tournament.js && node --check scr/tournament-v2.js && node --check scr/ai.js"
   },
   "dependencies": {
     "discord.js": "^14.27.0",
