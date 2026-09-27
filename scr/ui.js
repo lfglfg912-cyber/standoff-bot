@@ -21,6 +21,7 @@ export function mainPanel() {
     new ButtonBuilder().setCustomId('nav:profile').setLabel('👤 Профиль').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('nav:tournaments').setLabel('🏆 Турниры').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Кастом').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Кастом').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('nav:matches').setLabel('🎮 Мои матчи').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('nav:ai').setLabel('🤖 AI-помощник').setStyle(ButtonStyle.Success)
   );
@@ -153,6 +154,21 @@ export function customGameModal() {
     new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('team2').setLabel('Команда 2: Discord ID через запятую').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400)
     )
+  );
+}
+
+export function customGameButtons(game) {
+  const rows = [];
+  if (game?.veto_status === 'active') rows.push(...vetoButtons(game, game.bans || [], game.votes || [], 'custom'));
+  if (game?.veto_status === 'finished') rows.push(...resultButtons(game));
+  return rows;
+}
+
+export function customGameModal() {
+  return new ModalBuilder().setCustomId('custom:create').setTitle('⚔️ Кастомная игра на звание').addComponents(
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('format').setLabel('Формат: 1v1 / 2v2 / 3v3 / 4v4 / 5v5').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('team1').setLabel('Команда 1: Discord ID через запятую').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('team2').setLabel('Команда 2: Discord ID через запятую').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(400))
   );
 }
 
