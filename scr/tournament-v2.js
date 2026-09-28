@@ -378,9 +378,16 @@ export async function castMapVote(matchId, discordId, mapName) {
   const client = await (await import('./db.js')).pool.connect();
   try {
     await client.query('BEGIN');
-    const r = await client.query('SELECT * FROM matches WHERE id = $1 FOR UPDATE', [matchId]);
+    const r = await client.query(`
+      SELECT m.*, t.status AS tournament_status
+      FROM matches m
+      JOIN tournaments t ON t.id = m.tournament_id
+      WHERE m.id = $1
+      FOR UPDATE
+    `, [matchId]);
     const m = r.rows[0];
     if (!m) throw new Error('MATCH_NOT_FOUND');
+    if (m.tournament_status !== 'running') throw new Error('TOURNAMENT_NOT_ACTIVE');
     if (m.veto_status !== 'active') throw new Error('VETO_FINISHED');
     const participants = await getMatchParticipantsFromClient(client, m);
     if (!participants.includes(discordId)) throw new Error('NOT_A_PLAYER');
