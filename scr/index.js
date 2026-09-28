@@ -4,7 +4,7 @@ import {
   REST, Routes
 } from 'discord.js';
 import { initDb, getPlayer, upsertPlayer, listPlayers, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, clearModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, tournamentTeamNameModal, tournamentTeamSelection, resultButtons, resultScoreModal, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm, roundVoteButtons } from './ui.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, tournamentTeamNameModal, tournamentTeamSelection, resultButtons, resultScoreModal, profileStatsEmbed, profileSimpleSection, playMenuButtons, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm, roundVoteButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getRoundVoteState, castRoundVote, getCustomRoundVoteState, castCustomRoundVote, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 
@@ -201,6 +201,23 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (scope === 'nav') {
         if (action === 'profile') return showProfile(interaction);
+        if (action === 'play') {
+          const player = await ensurePlayer(interaction);
+          if (!player) {
+            return interaction.reply({
+              content: '👋 **Добро пожаловать в DOMINION!**\\n\\nСначала создай профиль. Это займёт меньше минуты: введи свой ник и ID Standoff 2.',
+              components: [new (await import('discord.js')).ActionRowBuilder().addComponents(
+                new (await import('discord.js')).ButtonBuilder().setCustomId('nav:profile').setLabel('👤 Создать профиль').setStyle((await import('discord.js')).ButtonStyle.Primary)
+              )],
+              ephemeral: true
+            });
+          }
+          return interaction.reply({
+            content: '🚀 **Готово! Что хочешь сделать?**\\n\\nВыбери один вариант:',
+            components: playMenuButtons(),
+            ephemeral: true
+          });
+        }
         if (action === 'custom') {
           const player = await ensurePlayer(interaction);
           if (!player) return interaction.showModal(profileModal());
@@ -255,7 +272,24 @@ client.on(Events.InteractionCreate, async interaction => {
         if (action === 'ai') {
           return interaction.reply({ content: '🤖 **ИИ временно недоступен.**\nФункция находится в разработке. Остальные функции DOMINION работают штатно.', ephemeral: true });
         }
-        if (action === 'help') return interaction.reply({ embeds: [new EmbedBuilder().setTitle('❓ DOMINION').setDescription('1. Создай профиль.\n2. Открой турниры.\n3. Нажми «Участвовать».\n4. После заполнения сетки администратор запускает турнир.\n5. После матча победитель подтверждается кнопкой.\n6. Следующий раунд создаётся автоматически.').setColor(0x8b0000)], ephemeral: true });
+        if (action === 'help') return interaction.reply({
+          embeds: [new EmbedBuilder()
+            .setTitle('❓ Как играть в DOMINION')
+            .setDescription(
+              '**1. 👤 Профиль** — введи ник и ID Standoff 2.\\n' +
+              '**2. 🚀 Играть** — выбери кастом или турнир.\\n' +
+              '**3. ⚔️ Кастом** — выбери формат и игроков.\\n' +
+              '**4. 🗳️ Раунды** — все игроки выбирают 10, 12, 14 или 16.\\n' +
+              '**5. 🗺️ Карта** — все игроки голосуют, карта с большинством голосов банится.\\n' +
+              '**6. 🎮 Матч** — после игры введи счёт.\\n\\n' +
+              '⭐ Первые 5 матчей — калибровка. После неё появляется звание.'
+            )
+            .setColor(0x8b0000)],
+          components: [new (await import('discord.js')).ActionRowBuilder().addComponents(
+            new (await import('discord.js')).ButtonBuilder().setCustomId('nav:play').setLabel('🚀 Начать играть').setStyle((await import('discord.js')).ButtonStyle.Success)
+          )],
+          ephemeral: true
+        });
         if (action === 'admin') {
           if (!isModerator(interaction)) return interaction.reply({ content: 'Эта панель доступна только администрации и модераторам.', ephemeral: true });
           return interaction.reply({ ...adminPanel(isAdmin(interaction)), ephemeral: true });
@@ -509,9 +543,15 @@ client.on(Events.InteractionCreate, async interaction => {
       if (interaction.customId === 'profile:save') {
         const nick = interaction.fields.getTextInputValue('nick').trim();
         const sid = interaction.fields.getTextInputValue('standoff_id').trim();
-        if (!sid) return interaction.reply({ content: '❌ ID игрока Standoff 2 обязателен.', ephemeral: true });
+        if (!nick) return interaction.reply({ content: '❌ Введи свой ник в Standoff 2.', ephemeral: true });
+        if (!sid) return interaction.reply({ content: '❌ Введи ID игрока Standoff 2.', ephemeral: true });
+        if (nick.length < 2) return interaction.reply({ content: '❌ Ник слишком короткий.', ephemeral: true });
         const player = await upsertPlayer(interaction.user.id, nick, sid);
-        return interaction.reply({ ...(await profileCard(player, interaction.user)), ephemeral: true });
+        return interaction.reply({
+          content: '✅ **Профиль готов!** Теперь нажми **🚀 Играть**, чтобы найти матч или создать кастом.',
+          ...(await profileCard(player, interaction.user)),
+          ephemeral: true
+        });
       }
       if (interaction.customId.startsWith('custom:score:') || interaction.customId.startsWith('match:score:')) {
         const [scope, , matchId, winnerType, winnerValue] = interaction.customId.split(':');
