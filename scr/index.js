@@ -544,7 +544,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const slots = Number(interaction.fields.getTextInputValue('slots').trim());
         const prize = Number(interaction.fields.getTextInputValue('prize').trim());
         const rounds = Number(interaction.fields.getTextInputValue('rounds').trim());
-        if (!TEAM_FORMATS[format] || ![4, 8, 16, 32].includes(slots) || !Number.isInteger(prize) || prize < 0 || !Number.isInteger(rounds) || rounds < 10 || rounds > 99) return interaction.reply({ content: 'Формат: 1v1/2v2/3v3/4v4/5v5. Слоты: 4/8/16/32. Раундов в матче: от 10 до 99. Приз — целое число.', ephemeral: true });
+        if (!TEAM_FORMATS[format] || ![4, 8, 16, 32].includes(slots) || !Number.isInteger(prize) || prize < 0 || !Number.isInteger(rounds) || ![10, 12, 14, 16].includes(rounds) === false) return interaction.reply({ content: 'Формат: 1v1/2v2/3v3/4v4/5v5. Слоты: 4/8/16/32. Раундов в матче: только 10, 12, 14 или 16. Приз — целое число.', ephemeral: true });
         const t = await createTournamentV2({ name, format, slots, prizeGold: prize, roundsPerMatch: rounds, createdBy: interaction.user.id });
         return interaction.reply({ content: `✅ Турнир **${t.name}** создан (#${t.id}) в формате **${format}**.`, ephemeral: true });
       }
