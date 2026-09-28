@@ -164,8 +164,25 @@ client.on(Events.InteractionCreate, async interaction => {
           if (!player) return interaction.showModal(profileModal());
           return interaction.reply({ embeds: [profileStatsEmbed(player)], components: profileButtons(), ephemeral: true });
         }
-        if (action === 'achievements') return interaction.reply({ embeds: [profileSimpleSection('🏆 Достижения', 'Система достижений подключается следующим модулем. Здесь будут MVP, серии побед и награды турниров.')], components: profileButtons(), ephemeral: true });
-        if (action === 'history') return interaction.reply({ embeds: [profileSimpleSection('🕘 История', 'Здесь будет история матчей, изменения рейтинга и полученные звания.')], components: profileButtons(), ephemeral: true });
+        if (action === 'achievements') {
+          const player = await ensurePlayer(interaction);
+          if (!player) return interaction.showModal(profileModal());
+          const wins = Number(player.wins || 0);
+          const total = wins + Number(player.losses || 0);
+          const achievements = [
+            [total >= 1, '🎯 Первый матч', 'Сыгран первый матч.'],
+            [wins >= 1, '🏆 Первая победа', 'Одержана первая победа.'],
+            [wins >= 5, '🔥 5 побед', 'Набрано 5 побед.'],
+            [wins >= 10, '⚔️ 10 побед', 'Набрано 10 побед.'],
+            [Number(player.tournaments || 0) >= 1, '🏟️ Турнирный боец', 'Участие в турнире.'],
+            [total >= 5, '🎖️ Калибровка пройдена', 'Сыграно 5 матчей и получено первое звание.']
+          ];
+          return interaction.reply({
+            embeds: [new EmbedBuilder().setTitle('🏆 Достижения DOMINION').setDescription(achievements.map(x => `${x[0] ? '✅' : '🔒'} **${x[1]}** — ${x[2]}`).join('\\n')).setColor(0x8b0000)],
+            components: profileButtons(), ephemeral: true
+          });
+        }
+        if (action === 'history') return interaction.reply({ ...(await matchesEmbed(interaction.user.id)), components: profileButtons(), ephemeral: true });
         if (action === 'ai') {
           return interaction.reply({ content: '🤖 **ИИ временно недоступен.**\nФункция находится в разработке. Остальные функции DOMINION работают штатно.', ephemeral: true });
         }
