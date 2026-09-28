@@ -28,6 +28,7 @@ export function mainPanel() {
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('nav:help').setLabel('❓ Как играть').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('nav:invite').setLabel('📢 Пригласить').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('nav:admin').setLabel('⚙️ Управление').setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row1, row2] };
