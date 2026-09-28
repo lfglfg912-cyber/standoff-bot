@@ -518,7 +518,7 @@ async function applyCompetitiveResult(client, winnerIds, loserIds, matchType = '
   if (!ids.length) return;
 
   const result = await client.query(
-    'SELECT discord_id, wins, losses, rating FROM players WHERE discord_id = ANY($1::text[]) FOR UPDATE',
+    'SELECT discord_id, wins, losses, rating, win_streak, best_streak FROM players WHERE discord_id = ANY($1::text[]) FOR UPDATE',
     [ids]
   );
   const before = new Map(result.rows.map(row => [String(row.discord_id), row]));
@@ -536,7 +536,9 @@ async function applyCompetitiveResult(client, winnerIds, loserIds, matchType = '
       : oldTotal < 5
         ? Math.max(0, Math.min(1300, 1000 + wins * 50 - losses * 30))
         : oldRating + 15;
-    await client.query('UPDATE players SET wins=$1, rating=$2, updated_at=NOW() WHERE discord_id=$3', [wins, rating, id]);
+    const streak = Number(row.win_streak || 0) + 1;
+    const bestStreak = Math.max(Number(row.best_streak || 0), streak);
+    await client.query('UPDATE players SET wins=$1, rating=$2, win_streak=$3, best_streak=$4, updated_at=NOW() WHERE discord_id=$5', [wins, rating, streak, bestStreak, id]);
     if (rating !== oldRating) {
       await client.query(
         "INSERT INTO rating_history (discord_id, match_type, match_id, old_rating, new_rating, delta) VALUES ($1,$2,$3,$4,$5,$6)",
@@ -558,7 +560,7 @@ async function applyCompetitiveResult(client, winnerIds, loserIds, matchType = '
       : oldTotal < 5
         ? Math.max(0, Math.min(1300, 1000 + wins * 50 - losses * 30))
         : Math.max(0, oldRating - 10);
-    await client.query('UPDATE players SET losses=$1, rating=$2, updated_at=NOW() WHERE discord_id=$3', [losses, rating, id]);
+    await client.query('UPDATE players SET losses=$1, rating=$2, win_streak=0, updated_at=NOW() WHERE discord_id=$3', [losses, rating, id]);
     if (rating !== oldRating) {
       await client.query(
         "INSERT INTO rating_history (discord_id, match_type, match_id, old_rating, new_rating, delta) VALUES ($1,$2,$3,$4,$5,$6)",
