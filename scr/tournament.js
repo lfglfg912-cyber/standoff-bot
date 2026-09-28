@@ -1,6 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { getTournamentV2, getTournamentTeams, getTournamentMatchesV2, getPlayerOrCaptainMatches, getVetoState, TEAM_FORMATS } from './tournament-v2.js';
-import { resultButtons, vetoButtons, tournamentCancelConfirm } from './ui.js';
+import { resultButtons, vetoButtons } from './ui.js';
 
 export function tournamentsEmbed(tournaments) {
   const embed = new EmbedBuilder().setTitle('🏆 Турниры DOMINION').setDescription(tournaments.length ? 'Выбери турнир ниже.' : 'Сейчас активных турниров нет.').setColor(0x8b0000);
