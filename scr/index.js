@@ -4,7 +4,7 @@ import {
   REST, Routes
 } from 'discord.js';
 import { initDb, getPlayer, upsertPlayer, listPlayers, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, clearModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm } from './ui.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, tournamentTeamNameModal, tournamentTeamSelection, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 
@@ -35,6 +35,7 @@ async function ensurePlayer(interaction) {
 }
 
 const customDrafts = new Map();
+const tournamentTeamDrafts = new Map();
 
 async function showProfile(interaction) {
   const player = await ensurePlayer(interaction);
@@ -126,6 +127,46 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     if (interaction.isUserSelectMenu()) {
+      if (interaction.customId.startsWith('t:teamselect:')) {
+        const tournamentId = interaction.customId.split(':')[2];
+        const draft = tournamentTeamDrafts.get(interaction.user.id);
+        if (!draft || String(draft.tournamentId) !== String(tournamentId)) {
+          return interaction.reply({ content: '❌ Сессия регистрации команды устарела. Нажми регистрацию команды ещё раз.', ephemeral: true });
+        }
+
+        const selected = interaction.values.map(String);
+        if (selected.includes(interaction.user.id)) {
+          return interaction.reply({ content: '❌ Ты уже капитан команды и не можешь выбрать себя ещё раз.', ephemeral: true });
+        }
+
+        const unique = [...new Set([interaction.user.id, ...selected])];
+        if (unique.length !== draft.teamSize) {
+          return interaction.reply({ content: `❌ Для ${draft.format} нужна команда ровно из ${draft.teamSize} игроков.`, ephemeral: true });
+        }
+
+        const registered = new Set((await listPlayers()).map(p => String(p.discord_id)));
+        if (unique.some(id => !registered.has(id))) {
+          return interaction.reply({ content: '❌ Все участники должны сначала создать профиль DOMINION.', ephemeral: true });
+        }
+
+        try {
+          const team = await registerTournamentTeam(
+            tournamentId,
+            interaction.user.id,
+            draft.teamName,
+            selected
+          );
+          tournamentTeamDrafts.delete(interaction.user.id);
+          return interaction.update({
+            content: `✅ **Команда ${team.name} зарегистрирована!**\\n\\nКапитан: <@${interaction.user.id}>\\nУчастники: ${unique.map(id => `<@${id}>`).join(', ')}`,
+            components: []
+          });
+        } catch (error) {
+          tournamentTeamDrafts.delete(interaction.user.id);
+          throw error;
+        }
+      }
+
       if (interaction.customId === 'mod:user') {
         if (!isModerator(interaction)) return interaction.reply({ content: 'Недостаточно прав для модерации.', ephemeral: true });
         const targetId = interaction.values[0];
@@ -366,7 +407,7 @@ client.on(Events.InteractionCreate, async interaction => {
           const size = TEAM_FORMATS[t.format || '1v1'];
           if (!size || size <= 1) return interaction.reply({ content: 'Для этого турнира нужна обычная регистрация.', ephemeral: true });
           if (!await getPlayer(interaction.user.id)) return interaction.reply({ content: 'Сначала создай профиль через 👤 Профиль.', ephemeral: true });
-          return interaction.showModal(teamRegistrationModal(id, size));
+          return interaction.showModal(tournamentTeamNameModal(id));
         }
         if (action === 'start') {
           if (!isAdmin(interaction)) return interaction.reply({ content: 'Запустить турнир может только администрация.', ephemeral: true });
@@ -475,12 +516,25 @@ client.on(Events.InteractionCreate, async interaction => {
       if (interaction.customId === 'ai:ask') {
         return interaction.reply({ content: '🤖 **ИИ временно недоступен.**\nФункция находится в разработке. Остальные функции DOMINION работают штатно.', ephemeral: true });
       }
-      if (interaction.customId.startsWith('team:register:')) {
+      if (interaction.customId.startsWith('team:name:')) {
         const tournamentId = interaction.customId.split(':')[2];
         const teamName = interaction.fields.getTextInputValue('team_name').trim();
-        const members = interaction.fields.getTextInputValue('members').trim();
-        await registerTournamentTeam(tournamentId, interaction.user.id, teamName, members);
-        return interaction.reply({ content: `✅ Команда **${teamName}** зарегистрирована. Капитан: <@${interaction.user.id}>.`, ephemeral: true });
+        const t = await getTournamentV2(tournamentId);
+        if (!t) return interaction.reply({ content: '❌ Турнир не найден.', ephemeral: true });
+        if (t.status !== 'registration') return interaction.reply({ content: '❌ Регистрация уже закрыта.', ephemeral: true });
+        const teamSize = TEAM_FORMATS[t.format || '1v1'];
+        if (!teamSize || teamSize <= 1) return interaction.reply({ content: '❌ Для этого турнира используется обычная регистрация.', ephemeral: true });
+        tournamentTeamDrafts.set(interaction.user.id, {
+          tournamentId: String(tournamentId),
+          teamName,
+          format: t.format,
+          teamSize
+        });
+        return interaction.reply({
+          content: `👑 **Команда ${teamName}**\\n\\nТы — капитан. Теперь выбери ещё **${teamSize - 1}** игроков.\\nВсе выбранные игроки должны иметь профиль DOMINION.`,
+          components: tournamentTeamSelection(tournamentId, teamSize),
+          ephemeral: true
+        });
       }
 
       if (interaction.customId === 'admin:create_tournament_modal') {
