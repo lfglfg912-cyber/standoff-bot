@@ -94,6 +94,11 @@ export async function getPlayer(discordId) {
   return rows[0] ?? null;
 }
 
+export async function listPlayers() {
+  const { rows } = await query('SELECT discord_id, standoff_nick, standoff_id FROM players ORDER BY standoff_nick ASC LIMIT 25');
+  return rows;
+}
+
 export async function upsertPlayer(discordId, nick, standoffId) {
   const { rows } = await query(`
     INSERT INTO players (discord_id, standoff_nick, standoff_id, verified)
