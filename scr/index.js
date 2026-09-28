@@ -171,8 +171,8 @@ client.on(Events.InteractionCreate, async interaction => {
         }
         if (action === 'help') return interaction.reply({ embeds: [new EmbedBuilder().setTitle('❓ DOMINION').setDescription('1. Создай профиль.\n2. Открой турниры.\n3. Нажми «Участвовать».\n4. После заполнения сетки администратор запускает турнир.\n5. После матча победитель подтверждается кнопкой.\n6. Следующий раунд создаётся автоматически.').setColor(0x8b0000)], ephemeral: true });
         if (action === 'admin') {
-          if (!isAdmin(interaction)) return interaction.reply({ content: 'Эта панель доступна только администрации.', ephemeral: true });
-          return interaction.reply({ ...adminPanel(), ephemeral: true });
+          if (!isModerator(interaction)) return interaction.reply({ content: 'Эта панель доступна только администрации и модераторам.', ephemeral: true });
+          return interaction.reply({ ...adminPanel(isAdmin(interaction)), ephemeral: true });
         }
       }
 
@@ -403,6 +403,8 @@ client.on(Events.InteractionCreate, async interaction => {
       : error.message === 'TOURNAMENT_FULL' ? 'Турнир уже заполнен.'
       : error.message === 'REGISTRATION_CLOSED' ? 'Регистрация уже закрыта.'
       : error.message === 'MATCH_ALREADY_DONE' ? 'Этот матч уже завершён.'
+      : error.message === 'TOURNAMENT_NOT_ACTIVE' ? 'Этот турнир уже не активен. Действие отменено.'
+      : error.message === 'TOURNAMENT_NOT_FOUND' ? 'Турнир не найден.'
       : error.message === 'NOT_A_PLAYER' ? 'Ты не участник этого матча.'
       : error.message === 'ALREADY_VOTED' ? 'Ты уже проголосовал в этом раунде.'
       : error.message === 'VETO_NOT_FINISHED' ? 'Сначала завершите голосование по картам.'
