@@ -271,7 +271,7 @@ export function aiModal() {
     ));
 }
 
-export function adminPanel() {
+export function adminPanel(canCreateTournament = false) {
   const embed = new EmbedBuilder()
     .setTitle('⚙️ Управление DOMINION')
     .setDescription('Админские действия доступны кнопками.\n\n🛡️ **Модерация:** предупреждение, тайм-аут, кик и бан.')
@@ -281,7 +281,7 @@ export function adminPanel() {
     components: [
       new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('admin:moderation').setLabel('🛡️ Модерация').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId('admin:create_tournament').setLabel('➕ Создать турнир').setStyle(ButtonStyle.Success),
+        ...(canCreateTournament ? [new ButtonBuilder().setCustomId('admin:create_tournament').setLabel('➕ Создать турнир').setStyle(ButtonStyle.Success)] : []),
         new ButtonBuilder().setCustomId('nav:tournaments').setLabel('🏆 Список турниров').setStyle(ButtonStyle.Secondary)
       )
     ]
