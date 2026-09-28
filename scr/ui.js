@@ -48,63 +48,96 @@ export async function profileCard(player, discordUser) {
     .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;').replaceAll("'", '&apos;');
 
-  const svg = '<svg width="1200" height="675" viewBox="0 0 1200 675" xmlns="http://www.w3.org/2000/svg">' +
-    '<defs>' +
-      '<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#05070a"/><stop offset=".55" stop-color="#111820"/><stop offset="1" stop-color="#050608"/></linearGradient>' +
-      '<linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff0b0"/><stop offset=".45" stop-color="#d7a947"/><stop offset="1" stop-color="#76501a"/></linearGradient>' +
-    '</defs>' +
-    '<rect width="1200" height="675" rx="28" fill="url(#bg)"/>' +
-    '<path d="M20 105V25h80M1100 25h80v80M20 570v80h80M1100 650h80v-80" fill="none" stroke="url(#gold)" stroke-width="3"/>' +
-    '<text x="58" y="62" fill="#f3d27c" font-size="28" font-family="DejaVu Sans" font-weight="700">DOMINION</text>' +
-    '<text x="58" y="90" fill="#a9b0b8" font-size="15" font-family="DejaVu Sans" letter-spacing="4">STANDOFF 2</text>' +
-    '<rect x="52" y="125" width="285" height="360" rx="20" fill="#0b0e12" stroke="url(#gold)" stroke-width="3"/>' +
-    '<path d="M82 445L155 175h127l23 270z" fill="#171d24"/>' +
-    '<circle cx="205" cy="255" r="70" fill="#202933" stroke="#b88b36" stroke-width="2"/>' +
-    '<path d="M140 235q65-70 130 0l-20 25h-90z" fill="#090b0e"/>' +
-    '<path d="M155 278q50-33 100 0l15 72q-65 40-130 0z" fill="#080b0e"/>' +
-    '<path d="M118 430l37-105 50 50 50-50 37 105z" fill="#141b22"/>' +
-    '<text x="72" y="462" fill="#e8c46a" font-size="17" font-family="DejaVu Sans" font-weight="700">DOMINION OPERATIVE</text>' +
-    '<text x="375" y="160" fill="#fff" font-size="38" font-family="DejaVu Sans" font-weight="700">' + esc(player.standoff_nick || 'Игрок') + '</text>' +
-    '<text x="378" y="190" fill="#aeb7c0" font-size="18" font-family="DejaVu Sans">Discord • ' + esc(discordUser.username || discordUser.tag || 'player') + '</text>' +
-    '<text x="378" y="222" fill="#aeb7c0" font-size="18" font-family="DejaVu Sans">Standoff ID • ' + esc(player.standoff_id || 'Не указан') + '</text>' +
-    '<rect x="375" y="245" width="745" height="110" rx="18" fill="#11161c" stroke="#6f5728"/>' +
-    '<text x="405" y="278" fill="#f2c66d" font-size="16" font-family="DejaVu Sans" font-weight="700">' + rank + '</text>' +
-    '<text x="405" y="315" fill="#fff" font-size="28" font-family="DejaVu Sans" font-weight="700">' + (calibration ? ('Матчи ' + progress + '/5') : ('Рейтинг ' + rating)) + '</text>' +
-    '<text x="405" y="340" fill="#929aa3" font-size="15" font-family="DejaVu Sans">' + (calibration ? 'Сыграй 5 матчей, чтобы получить звание' : 'Звание игрока') + '</text>' +
-    '<rect x="720" y="287" width="300" height="14" rx="7" fill="#242b32"/>' +
-    '<rect x="720" y="287" width="' + (300 * progress / 5) + '" height="14" rx="7" fill="url(#gold)"/>' +
-    '<text x="1040" y="302" fill="#f2c66d" font-size="18" font-family="DejaVu Sans" font-weight="700">' + progress + '/5</text>' +
-    '<rect x="375" y="385" width="175" height="105" rx="16" fill="#11161c" stroke="#303941"/>' +
-    '<rect x="565" y="385" width="175" height="105" rx="16" fill="#11161c" stroke="#303941"/>' +
-    '<rect x="755" y="385" width="175" height="105" rx="16" fill="#11161c" stroke="#303941"/>' +
-    '<rect x="945" y="385" width="175" height="105" rx="16" fill="#11161c" stroke="#303941"/>' +
-    '<text x="400" y="415" fill="#929aa3" font-size="14" font-family="DejaVu Sans">МАТЧИ</text><text x="400" y="457" fill="#fff" font-size="30" font-family="DejaVu Sans" font-weight="700">' + total + '</text>' +
-    '<text x="585" y="415" fill="#929aa3" font-size="14" font-family="DejaVu Sans">WINRATE</text><text x="585" y="457" fill="#fff" font-size="30" font-family="DejaVu Sans" font-weight="700">' + winrate + '%</text>' +
-    '<text x="775" y="415" fill="#929aa3" font-size="14" font-family="DejaVu Sans">W / L</text><text x="775" y="457" fill="#fff" font-size="30" font-family="DejaVu Sans" font-weight="700">' + wins + ' / ' + losses + '</text>' +
-    '<text x="965" y="415" fill="#929aa3" font-size="14" font-family="DejaVu Sans">ТУРНИРЫ</text><text x="965" y="457" fill="#fff" font-size="30" font-family="DejaVu Sans" font-weight="700">' + Number(player.tournaments || 0) + '</text>' +
-    '<rect x="375" y="525" width="745" height="82" rx="16" fill="#0a0d11" stroke="#6f5728"/>' +
-    '<text x="405" y="557" fill="#f2c66d" font-size="14" font-family="DejaVu Sans">СТАТУС</text>' +
-    '<text x="405" y="584" fill="#fff" font-size="18" font-family="DejaVu Sans">' + (player.verified ? '✓ Верифицирован' : '◷ Профиль не верифицирован') + '</text>' +
-    '<text x="760" y="557" fill="#f2c66d" font-size="14" font-family="DejaVu Sans">ЗВАНИЕ</text>' +
-    '<text x="760" y="584" fill="#fff" font-size="18" font-family="DejaVu Sans">' + rank + '</text>' +
-    '</svg>';
-
+  const rankRu = { LEGEND: 'Legend', ELITE: 'Elite', VETERAN: 'Veteran', FIGHTER: 'Fighter', RECRUIT: 'Recruit', КАЛИБРОВКА: 'Калибровка' }[rank] || rank;
   const avatarUrl = discordUser.displayAvatarURL({ extension: 'png', size: 256 });
   let avatarData = '';
   try {
     const response = await fetch(avatarUrl);
-    if (response.ok) {
-      const avatarBuffer = Buffer.from(await response.arrayBuffer());
-      avatarData = `data:image/png;base64,${avatarBuffer.toString('base64')}`;
-    }
+    if (response.ok) avatarData = `data:image/png;base64,${Buffer.from(await response.arrayBuffer()).toString('base64')}`;
   } catch (error) {
     console.warn('[DOMINION] Could not load Discord avatar:', error.message);
   }
 
-  const avatarSvg = avatarData ?
-    `<defs><clipPath id="avatarClip"><circle cx="205" cy="255" r="64"/></clipPath></defs><image href="${avatarData}" x="141" y="191" width="128" height="128" preserveAspectRatio="xMidYMid slice" clip-path="url(#avatarClip)"/>` : '';
-  const finalSvg = svg.replace('</svg>', avatarSvg + '</svg>');
-  const buffer = await sharp(Buffer.from(finalSvg)).png().toBuffer();
+  const avatar = avatarData
+    ? `<clipPath id="av"><circle cx="145" cy="145" r="105"/></clipPath><image href="${avatarData}" x="40" y="40" width="210" height="210" preserveAspectRatio="xMidYMid slice" clip-path="url(#av)"/>`
+    : '<circle cx="145" cy="145" r="105" fill="#171c24"/><text x="145" y="160" text-anchor="middle" fill="#d7a947" font-size="54" font-family="DejaVu Sans">D</text>';
+
+  const progressWidth = 420 * progress / 5;
+
+  const svg = `<svg width="1536" height="900" viewBox="0 0 1536 900" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#030508"/><stop offset=".55" stop-color="#111820"/><stop offset="1" stop-color="#050608"/></linearGradient>
+      <linearGradient id="red" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#ff202d"/><stop offset="1" stop-color="#7b0008"/></linearGradient>
+      <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0b0"/><stop offset=".5" stop-color="#d7a947"/><stop offset="1" stop-color="#76501a"/></linearGradient>
+      <filter id="glow"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <clipPath id="av"><circle cx="145" cy="145" r="105"/></clipPath>
+    </defs>
+    <rect width="1536" height="900" fill="url(#bg)"/>
+    <path d="M0 250L250 0h250L0 500z" fill="#5c0008" opacity=".16"/>
+    <path d="M1536 150L1330 0h-250l456 360z" fill="#65000a" opacity=".13"/>
+    <path d="M0 20H360M0 20V250M1536 20H1176M1536 20V250M0 880H360M0 880V650M1536 880H1176M1536 880V650" stroke="url(#red)" stroke-width="4" fill="none"/>
+    <rect x="28" y="28" width="1480" height="844" rx="26" fill="none" stroke="#252d36" stroke-width="2"/>
+    <text x="60" y="76" fill="#fff" font-size="34" font-family="DejaVu Sans" font-weight="700">DOMINION</text>
+    <text x="62" y="105" fill="#aab1ba" font-size="15" font-family="DejaVu Sans" letter-spacing="5">STANDOFF 2</text>
+    <text x="60" y="145" fill="#727b85" font-size="13" font-family="DejaVu Sans">ОРДЕН ИГРОКОВ · ПРОФИЛЬ БОЙЦА</text>
+
+    <rect x="58" y="180" width="290" height="610" rx="22" fill="#080b10" stroke="url(#red)" stroke-width="3"/>
+    <circle cx="145" cy="145" r="112" fill="#07090c" stroke="url(#gold)" stroke-width="5" filter="url(#glow)"/>
+    ${avatar}
+    <circle cx="219" cy="219" r="14" fill="#1bd760" stroke="#071008" stroke-width="6"/>
+    <text x="205" y="292" text-anchor="middle" fill="#e9c66f" font-size="20" font-family="DejaVu Sans" font-weight="700">DOMINION OPERATIVE</text>
+    <text x="203" y="332" text-anchor="middle" fill="#fff" font-size="30" font-family="DejaVu Sans" font-weight="700">${esc(player.standoff_nick || 'Игрок')}</text>
+    <text x="203" y="360" text-anchor="middle" fill="#87909a" font-size="17" font-family="DejaVu Sans">Discord · ${esc(discordUser.username || discordUser.tag || 'player')}</text>
+    <rect x="88" y="390" width="230" height="58" rx="15" fill="#10151b" stroke="#363e47"/>
+    <text x="203" y="416" text-anchor="middle" fill="#89929c" font-size="13" font-family="DejaVu Sans">STANDOFF ID</text>
+    <text x="203" y="438" text-anchor="middle" fill="#fff" font-size="19" font-family="DejaVu Sans" font-weight="700">${esc(player.standoff_id || 'Не указан')}</text>
+    <text x="86" y="495" fill="#7f8993" font-size="14" font-family="DejaVu Sans">СТАТУС</text>
+    <text x="86" y="522" fill="#fff" font-size="18" font-family="DejaVu Sans">${player.verified ? '✓ Верифицирован' : '◷ Не верифицирован'}</text>
+    <text x="86" y="570" fill="#7f8993" font-size="14" font-family="DejaVu Sans">РОЛЬ</text>
+    <text x="86" y="597" fill="#fff" font-size="18" font-family="DejaVu Sans">Игрок Standoff 2</text>
+    <text x="86" y="645" fill="#7f8993" font-size="14" font-family="DejaVu Sans">СПЕЦИАЛИЗАЦИЯ</text>
+    <text x="86" y="672" fill="#fff" font-size="18" font-family="DejaVu Sans">Не указана</text>
+    <text x="86" y="740" fill="#a9b1ba" font-size="13" font-family="DejaVu Sans">SKILL · DISCIPLINE · DOMINATION</text>
+
+    <text x="390" y="205" fill="#fff" font-size="48" font-family="DejaVu Sans" font-weight="700">${esc(player.standoff_nick || 'Игрок')}</text>
+    <text x="392" y="240" fill="#8e98a2" font-size="18" font-family="DejaVu Sans">Discord · ${esc(discordUser.username || discordUser.tag || 'player')}   •   Standoff ID · ${esc(player.standoff_id || 'Не указан')}</text>
+
+    <rect x="390" y="270" width="1090" height="150" rx="22" fill="#0b1016" stroke="#6c5225" stroke-width="2"/>
+    <text x="425" y="308" fill="#d8aa4e" font-size="15" font-family="DejaVu Sans" font-weight="700">RANK</text>
+    <text x="425" y="353" fill="#fff" font-size="36" font-family="DejaVu Sans" font-weight="700">${rankRu}</text>
+    <text x="425" y="387" fill="#9ca5ae" font-size="17" font-family="DejaVu Sans">${calibration ? `Калибровка · матчи ${progress}/5` : `MMR · ${rating}`}</text>
+    <path d="M700 300l45 45-45 45-45-45z" fill="#121922" stroke="url(#gold)" stroke-width="4"/>
+    <path d="M700 315l28 30-28 30-28-30z" fill="#d7a947"/>
+    <text x="790" y="312" fill="#8d969f" font-size="14" font-family="DejaVu Sans">ПРОГРЕСС КАЛИБРОВКИ</text>
+    <rect x="790" y="330" width="420" height="16" rx="8" fill="#252c33"/>
+    <rect x="790" y="330" width="${progressWidth}" height="16" rx="8" fill="url(#red)"/>
+    <text x="1230" y="346" fill="#e2bb61" font-size="19" font-family="DejaVu Sans" font-weight="700">${progress}/5</text>
+    <text x="790" y="382" fill="#8d969f" font-size="14" font-family="DejaVu Sans">${calibration ? 'Сыграй 5 матчей, чтобы получить звание' : 'Звание рассчитано по текущему рейтингу'}</text>
+
+    <g>
+      <rect x="390" y="450" width="250" height="130" rx="18" fill="#0b1016" stroke="#303942"/>
+      <rect x="660" y="450" width="250" height="130" rx="18" fill="#0b1016" stroke="#303942"/>
+      <rect x="930" y="450" width="250" height="130" rx="18" fill="#0b1016" stroke="#303942"/>
+      <rect x="1200" y="450" width="280" height="130" rx="18" fill="#0b1016" stroke="#303942"/>
+      <text x="420" y="485" fill="#8c969f" font-size="14" font-family="DejaVu Sans">МАТЧИ</text><text x="420" y="540" fill="#fff" font-size="39" font-family="DejaVu Sans" font-weight="700">${total}</text>
+      <text x="690" y="485" fill="#8c969f" font-size="14" font-family="DejaVu Sans">ПОБЕДЫ</text><text x="690" y="540" fill="#fff" font-size="39" font-family="DejaVu Sans" font-weight="700">${wins}</text>
+      <text x="960" y="485" fill="#8c969f" font-size="14" font-family="DejaVu Sans">WINRATE</text><text x="960" y="540" fill="#fff" font-size="39" font-family="DejaVu Sans" font-weight="700">${winrate}%</text>
+      <text x="1230" y="485" fill="#8c969f" font-size="14" font-family="DejaVu Sans">W / L · ТУРНИРЫ</text><text x="1230" y="540" fill="#fff" font-size="30" font-family="DejaVu Sans" font-weight="700">${wins} / ${losses} · ${Number(player.tournaments || 0)}</text>
+    </g>
+
+    <rect x="390" y="610" width="1090" height="180" rx="22" fill="#080c11" stroke="#252d36"/>
+    <text x="425" y="650" fill="#fff" font-size="21" font-family="DejaVu Sans" font-weight="700">ПРОФИЛЬ DOMINION</text>
+    <text x="425" y="687" fill="#8f98a2" font-size="16" font-family="DejaVu Sans">Игрок зарегистрирован в системе и готов участвовать в матчах и турнирах.</text>
+    <text x="425" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">RANK</text><text x="425" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${rankRu}</text>
+    <text x="680" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">РЕЙТИНГ</text><text x="680" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${rating}</text>
+    <text x="930" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">СТАТУС</text><text x="930" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${player.verified ? 'Верифицирован' : 'Не верифицирован'}</text>
+    <text x="1210" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">ТУРНИРЫ</text><text x="1210" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${Number(player.tournaments || 0)}</text>
+
+    <text x="60" y="845" fill="#a0a8b1" font-size="16" font-family="DejaVu Sans">DOMINION · Skill. Discipline. Domination.</text>
+    <text x="1250" y="845" fill="#e41b2b" font-size="18" font-family="DejaVu Sans" font-weight="700">ИГРАЕМ · РАЗВИВАЕМ · ПОБЕЖДАЕМ</text>
+  </svg>`;
+
+  const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
   const attachment = new AttachmentBuilder(buffer, { name: 'dominion-profile.png' });
   const embed = new EmbedBuilder().setColor(0x8b0000)
     .setImage('attachment://dominion-profile.png')
