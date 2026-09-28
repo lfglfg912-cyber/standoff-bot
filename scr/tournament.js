@@ -1,6 +1,6 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getTournamentV2, getTournamentTeams, getTournamentTeamMembersWithStats, getTournamentMatchesV2, getPlayerOrCaptainMatches, getVetoState, TEAM_FORMATS } from './tournament-v2.js';
-import { resultButtons, vetoButtons } from './ui.js';
+import { getTournamentV2, getTournamentTeams, getTournamentTeamMembersWithStats, getTournamentMatchesV2, getPlayerOrCaptainMatches, getVetoState, getRoundVoteState, TEAM_FORMATS } from './tournament-v2.js';
+import { resultButtons, vetoButtons, roundVoteButtons } from './ui.js';
 
 function roundLabel(round, totalSlots) {
   const rounds = Math.max(1, Math.ceil(Math.log2(Number(totalSlots) || 1)));
@@ -88,13 +88,25 @@ export async function tournamentView(id, canManage = false) {
     ));
   }
   for(const m of matches.filter(x=>x.status!=='completed' && x.status!=='cancelled').slice(0,3)){
+    const roundState = await getRoundVoteState(m.id);
+    if (!roundState.match.rounds_selected) {
+      const majority = Math.floor(roundState.participants.length / 2) + 1;
+      const voteText = roundState.votes.length ? roundState.votes.map(v => `${v.rounds}: **${v.votes}**`).join(' · ') : 'голосов пока нет';
+      embed.addFields({
+        name: `🗳️ Раунды · матч ${m.match_no}`,
+        value: `Игроков: **${roundState.participants.length}** · большинство: **${majority}**\\nПроголосовали: **${roundState.votedPlayers.length}/${roundState.participants.length}**\\nГолоса: ${voteText}\\nВарианты: **10 / 12 / 14 / 16**`
+      });
+      components.push(...roundVoteButtons(m.id, 'round'));
+      continue;
+    }
+
     const state=await getVetoState(m.id);
     if(state.match.veto_status==='active'){
       const banned=state.bans, remaining=(state.match.map_pool||[]).filter(x=>!banned.some(b=>b.map_name===x));
       const majority = Math.floor(Number(state.participants || 0) / 2) + 1;
       const voted = state.votedPlayers?.length || 0;
       const voteText = state.votes?.length ? state.votes.map(v=>`${v.map_name}: **${v.votes}**`).join(' · ') : 'голосов пока нет';
-      embed.addFields({name:`🗳️ Голосование · матч ${m.match_no}`,value:`Игроков: **${state.participants}** · большинство: **${majority}**\\nПроголосовали: **${voted}/${state.participants}**\\nОсталось: **${remaining.join(', ')}**\\nГолоса: ${voteText}`});
+      embed.addFields({name:`🗳️ Голосование · матч ${m.match_no}`,value:`Игроков: **${state.participants}** · большинство: **${majority}**\nПроголосовали: **${voted}/${state.participants}**\nОсталось: **${remaining.join(', ')}**\nГолоса: ${voteText}`});
       components.push(...vetoButtons(state.match,banned,state.votes));
     }
     if(state.match.veto_status==='finished') components.push(...resultButtons(state.match));
