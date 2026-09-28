@@ -75,6 +75,58 @@ async function sendMainPanel(channel) {
   return channel.send(mainPanel());
 }
 
+async function clearChannel(channel) {
+  if (!channel?.isTextBased() || !channel.messages) return;
+  let deleted = 0;
+
+  while (true) {
+    const messages = await channel.messages.fetch({ limit: 100 });
+    if (!messages.size) break;
+
+    const recent = [];
+    const old = [];
+
+    for (const message of messages.values()) {
+      if (Date.now() - message.createdTimestamp < 14 * 24 * 60 * 60 * 1000) recent.push(message);
+      else old.push(message);
+    }
+
+    if (recent.length) {
+      await channel.bulkDelete(recent, true);
+      deleted += recent.length;
+    }
+
+    for (const message of old) {
+      await message.delete().catch(() => {});
+      deleted++;
+    }
+
+    if (messages.size < 100) break;
+  }
+
+  return deleted;
+}
+
+async function refreshPanelChannels() {
+  const guild = await client.guilds.fetch(process.env.DISCORD_GUILD_ID).catch(() => null);
+  if (!guild) return;
+
+  const channelIds = [...new Set([process.env.PANEL_CHANNEL_ID, SECONDARY_PANEL_CHANNEL_ID].filter(Boolean))];
+
+  for (const channelId of channelIds) {
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel?.isTextBased()) continue;
+
+    try {
+      await clearChannel(channel);
+      await sendMainPanel(channel);
+      console.log(`[DOMINION] Panel channel ${channelId} cleaned and refreshed.`);
+    } catch (error) {
+      console.error(`[DOMINION] Failed to clean panel channel ${channelId}:`, error);
+    }
+  }
+}
+
 
 client.once(Events.ClientReady, async ready => {
   console.log(`[DOMINION] Logged in as ${ready.user.tag}`);
@@ -82,6 +134,8 @@ client.once(Events.ClientReady, async ready => {
     await initDb();
     await initTournamentV2Db();
     console.log('[DOMINION] Database ready. Main panel is available with /p.');
+    setInterval(() => refreshPanelChannels(), 60 * 60 * 1000);
+    console.log('[DOMINION] Panel channels will be cleaned and refreshed every 60 minutes.');
   } catch (error) {
     console.error('[DOMINION] Startup error:', error);
     process.exitCode = 1;
