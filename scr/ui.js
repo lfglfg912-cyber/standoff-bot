@@ -1,6 +1,6 @@
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder,
-  ModalBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder
+  ModalBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder, StringSelectMenuBuilder
 } from 'discord.js';
 import sharp from 'sharp';
 
@@ -160,20 +160,51 @@ export function profileSimpleSection(title, description) {
   return new EmbedBuilder().setTitle(title).setDescription(description).setColor(0x8b0000);
 }
 
+export function customFormatButtons() {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('custom:format:1v1').setLabel('1v1').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('custom:format:2v2').setLabel('2v2').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('custom:format:3v3').setLabel('3v3').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('custom:format:4v4').setLabel('4v4').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('custom:format:5v5').setLabel('5v5').setStyle(ButtonStyle.Primary)
+  )];
+}
+
+export function customPlayerSelection(format, players, creatorId) {
+  const size = Number(format.split('v')[0]);
+  const available = players.filter(p => p.discord_id !== creatorId);
+  const options = available.map(p => ({
+    label: String(p.standoff_nick || 'Игрок').slice(0, 100),
+    value: p.discord_id,
+    description: ('ID: ' + p.discord_id).slice(0, 100)
+  }));
+  const rows = [];
+  if (size > 1) {
+    rows.push(new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId('custom:team1')
+        .setPlaceholder(`Команда 1: выбери ещё ${size - 1} игрок(а)`)
+        .setMinValues(size - 1).setMaxValues(size - 1)
+        .addOptions(options)
+    ));
+  }
+  rows.push(new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('custom:team2')
+      .setPlaceholder(`Команда 2: выбери ${size} игрок(а)`)
+      .setMinValues(size).setMaxValues(size)
+      .addOptions(options)
+  ));
+  return rows;
+}
+
 export function customGameModal() {
-  return new ModalBuilder().setCustomId('custom:create').setTitle('⚔️ Кастомная игра на звание').addComponents(
+  return new ModalBuilder().setCustomId('custom:create').setTitle('Кастомная игра на звание').addComponents(
     new ActionRowBuilder().addComponents(
       new TextInputBuilder().setCustomId('format').setLabel('Формат: 1v1 / 2v2 / 3v3 / 4v4 / 5v5').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('team1').setLabel('Команда 1 — ID игроков').setStyle(TextInputStyle.Short).setPlaceholder('ID через пробел или запятую').setRequired(true).setMaxLength(100)
-    ),
-    new ActionRowBuilder().addComponents(
-      new TextInputBuilder().setCustomId('team2').setLabel('Команда 2 — ID игроков').setStyle(TextInputStyle.Short).setPlaceholder('ID через пробел или запятую').setRequired(true).setMaxLength(100)
     )
   );
 }
-
 export function customGameButtons(game) {
   const rows = [];
   if (game?.veto_status === 'active') rows.push(...vetoButtons(game, game.bans || [], game.votes || [], 'custom'));
