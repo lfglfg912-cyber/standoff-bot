@@ -331,6 +331,33 @@ export function tournamentCreateModal() {
   );
 }
 
+export function tournamentTeamNameModal(tournamentId) {
+  return new ModalBuilder()
+    .setCustomId(`team:name:${tournamentId}`)
+    .setTitle('Регистрация команды')
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('team_name')
+          .setLabel('Название команды')
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(32)
+      )
+    );
+}
+
+export function tournamentTeamSelection(tournamentId, teamSize) {
+  const count = Math.max(1, Number(teamSize) - 1);
+  return [new ActionRowBuilder().addComponents(
+    new UserSelectMenuBuilder()
+      .setCustomId(`t:teamselect:${tournamentId}`)
+      .setPlaceholder(`Выбери ещё ${count} игрок(а) команды`)
+      .setMinValues(count)
+      .setMaxValues(count)
+  )];
+}
+
 export function teamRegistrationModal(tournamentId, teamSize) {
   const help = teamSize === 2
     ? 'ID напарника (Discord ID или @упоминание)'
