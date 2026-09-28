@@ -3,8 +3,8 @@ import {
   Client, GatewayIntentBits, Events, PermissionsBitField, EmbedBuilder,
   REST, Routes
 } from 'discord.js';
-import { initDb, getPlayer, upsertPlayer, listPlayers, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, tournamentCancelConfirm } from './ui.js';
+import { initDb, getPlayer, upsertPlayer, listPlayers, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, clearModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
@@ -250,6 +250,33 @@ client.on(Events.InteractionCreate, async interaction => {
 
       if (scope === 'mod') {
         if (!isModerator(interaction)) return interaction.reply({ content: 'Недостаточно прав для модерации.', ephemeral: true });
+
+        if (action === 'warnings') {
+          const warnings = await getModerationWarnings(interaction.guild.id, id);
+          const text = warnings.length
+            ? warnings.slice(0, 10).map((w, i) => `**${i + 1}.** ${w.reason} — <@${w.moderator_id}>`).join('\\n')
+            : 'У участника нет предупреждений.';
+          return interaction.update({
+            content: `📋 **Предупреждения <@${id}>**\\n\\n${text}\\n\\nВсего: **${warnings.length}**`,
+            components: warningListButtons(id, warnings.length > 0)
+          });
+        }
+
+        if (action === 'back') {
+          return interaction.update({
+            content: `🛡️ **Модерация участника**\\n\\nУчастник: <@${id}>\\nВыбери действие:`,
+            components: moderationActions(id)
+          });
+        }
+
+        if (action === 'clear') {
+          const count = await clearModerationWarnings(interaction.guild.id, id);
+          return interaction.update({
+            content: `🧹 Предупреждения <@${id}> сброшены. Удалено: **${count}**.`,
+            components: moderationActions(id)
+          });
+        }
+
         if (!['warn', 'timeout', 'kick', 'ban'].includes(action)) return interaction.reply({ content: 'Неизвестное действие модерации.', ephemeral: true });
         return interaction.showModal(moderationReasonModal(action, id));
       }
