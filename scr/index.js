@@ -80,10 +80,7 @@ client.once(Events.ClientReady, async ready => {
   try {
     await initDb();
     await initTournamentV2Db();
-    const channel = await ready.channels.fetch(process.env.PANEL_CHANNEL_ID);
-    if (!channel?.isTextBased()) throw new Error('PANEL_CHANNEL_ID is not a text channel');
-    await sendMainPanel(channel);
-    console.log('[DOMINION] Database ready; main panel ready.');
+    console.log('[DOMINION] Database ready. Main panel is published with /panel.');
   } catch (error) {
     console.error('[DOMINION] Startup error:', error);
     process.exitCode = 1;
@@ -94,9 +91,20 @@ client.on(Events.InteractionCreate, async interaction => {
   try {
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === 'panel') {
-        if (!isAdmin(interaction)) return interaction.reply({ content: 'Недостаточно прав.', ephemeral: true });
-        await interaction.reply({ content: 'Панель опубликована.', ephemeral: true });
-        await sendMainPanel(interaction.channel);
+        if (!isAdmin(interaction)) {
+          return interaction.reply({ content: '❌ Команда /panel доступна только администратору.', ephemeral: true });
+        }
+
+        const channel = await interaction.guild.channels.fetch(process.env.PANEL_CHANNEL_ID).catch(() => null);
+        if (!channel?.isTextBased()) {
+          return interaction.reply({ content: '❌ Канал панели не найден. Проверь PANEL_CHANNEL_ID.', ephemeral: true });
+        }
+
+        await sendMainPanel(channel);
+        return interaction.reply({
+          content: `✅ Панель DOMINION опубликована в <#${channel.id}>.`,
+          ephemeral: true
+        });
       }
       return;
     }
