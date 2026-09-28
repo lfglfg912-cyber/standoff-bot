@@ -2,6 +2,28 @@ import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'disc
 import { getTournamentV2, getTournamentTeams, getTournamentTeamMembersWithStats, getTournamentMatchesV2, getPlayerOrCaptainMatches, getVetoState, TEAM_FORMATS } from './tournament-v2.js';
 import { resultButtons, vetoButtons } from './ui.js';
 
+function roundLabel(round, totalSlots) {
+  const rounds = Math.max(1, Math.ceil(Math.log2(Number(totalSlots) || 1)));
+  const fromFinal = rounds - Number(round) + 1;
+  if (fromFinal === 1) return '🏆 Финал';
+  if (fromFinal === 2) return '🥈 Полуфинал';
+  if (fromFinal === 3) return '⚔️ Четвертьфинал';
+  return `🔹 Раунд ${round}`;
+}
+
+function matchLine(m) {
+  const a = m.team1_name || m.player1_nick || (m.player1_id ? `<@${m.player1_id}>` : 'Ожидание');
+  const b = m.team2_name || m.player2_nick || (m.player2_id ? `<@${m.player2_id}>` : 'Ожидание');
+  const status = m.status === 'completed'
+    ? `🏆 ${m.winner_team_name || m.winner_nick || 'победитель'}`
+    : m.status === 'cancelled'
+      ? '🛑 отменён'
+      : m.selected_map
+        ? `🗺️ ${m.selected_map}`
+        : '🗳️ Бан карт';
+  return `Матч ${m.match_no}: **${a}** vs **${b}** · ${status}`;
+}
+
 export function tournamentsEmbed(tournaments) {
   const embed = new EmbedBuilder().setTitle('🏆 Турниры DOMINION').setDescription(tournaments.length ? 'Выбери турнир ниже.' : 'Сейчас активных турниров нет.').setColor(0x8b0000);
   for (const t of tournaments) embed.addFields({ name:`#${t.id} · ${t.name}`, value:`Формат: **${t.format || '1v1'}** · ${t.status === 'registration' ? 'Регистрация' : 'Идёт'}\\n${(t.format || '1v1') === '1v1' ? 'Участники' : 'Команды'}: **${t.registered}/${t.slots}** · Приз: **${t.prize_gold} G**` });
@@ -34,9 +56,23 @@ export async function tournamentView(id, canManage = false) {
   const components=[];
   if(matches.length){
     const active=matches.filter(m=>m.status!=='completed' && m.status!=='cancelled');
-    if(active.length) embed.addFields({name:'🎮 Текущие матчи',value:active.slice(0,10).map(m=>`Раунд ${m.round}, матч ${m.match_no}: **${m.team1_name||m.player1_nick}** vs **${m.team2_name||m.player2_nick}** · ${m.selected_map?`🗺️ **${m.selected_map}**`:'🚫 Бан карт'}`).join('\n')});
-    const done=matches.filter(m=>m.status==='completed');
-    if(done.length) embed.addFields({name:'✅ Завершённые',value:done.slice(-8).reverse().map(m=>`Раунд ${m.round}, матч ${m.match_no}: **${m.winner_team_name||m.winner_nick||'победитель'}**`).join('\n')});
+    if(active.length) {
+      embed.addFields({
+        name:'🎮 Текущие матчи',
+        value:active.slice(0,10).map(matchLine).join('\\n')
+      });
+    }
+
+    const rounds = [...new Set(matches.map(m => Number(m.round)).filter(Number.isFinite))].sort((a,b)=>a-b);
+    for (const round of rounds) {
+      const roundMatches = matches.filter(m => Number(m.round) === round);
+      if (!roundMatches.length) continue;
+      const value = roundMatches.map(matchLine).join('\\n');
+      embed.addFields({
+        name: roundLabel(round, t.slots),
+        value: value.slice(0, 1024)
+      });
+    }
   }
   if(t.status==='registration'){
     const row=new ActionRowBuilder();
