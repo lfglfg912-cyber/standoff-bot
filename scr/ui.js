@@ -129,7 +129,7 @@ export async function profileCard(player, discordUser) {
     <text x="425" y="650" fill="#fff" font-size="21" font-family="DejaVu Sans" font-weight="700">ПРОФИЛЬ DOMINION</text>
     <text x="425" y="687" fill="#8f98a2" font-size="16" font-family="DejaVu Sans">Игрок зарегистрирован в системе и готов участвовать в матчах и турнирах.</text>
     <text x="425" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">RANK</text><text x="425" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${rankRu}</text>
-    <text x="680" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">РЕЙТИНГ</text><text x="680" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${rating}</text>
+    <text x="680" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">РЕЙТИНГ</text><text x="680" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${calibration ? 0 : rating}</text>
     <text x="930" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">СТАТУС</text><text x="930" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${player.verified ? 'Верифицирован' : 'Не верифицирован'}</text>
     <text x="1210" y="727" fill="#d7a947" font-size="14" font-family="DejaVu Sans">ТУРНИРЫ</text><text x="1210" y="754" fill="#fff" font-size="19" font-family="DejaVu Sans">${Number(player.tournaments || 0)}</text>
 
