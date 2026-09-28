@@ -38,6 +38,8 @@ export async function initDb() {
       wins INTEGER NOT NULL DEFAULT 0,
       losses INTEGER NOT NULL DEFAULT 0,
       tournaments INTEGER NOT NULL DEFAULT 0,
+      win_streak INTEGER NOT NULL DEFAULT 0,
+      best_streak INTEGER NOT NULL DEFAULT 0,
       verified BOOLEAN NOT NULL DEFAULT FALSE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -101,6 +103,9 @@ export async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    ALTER TABLE players ADD COLUMN IF NOT EXISTS win_streak INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE players ADD COLUMN IF NOT EXISTS best_streak INTEGER NOT NULL DEFAULT 0;
 
     UPDATE players SET verified = TRUE, updated_at = NOW() WHERE COALESCE(TRIM(standoff_nick), '') <> '' AND COALESCE(TRIM(standoff_id), '') <> '';
 
