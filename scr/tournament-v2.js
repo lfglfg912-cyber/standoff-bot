@@ -154,6 +154,19 @@ export async function getTournamentV2(id) {
   return rows[0] ?? null;
 }
 
+export async function getTournamentTeamMembersWithStats(tournamentId) {
+  const { rows } = await query(`
+    SELECT tt.id AS team_id, tt.name AS team_name, tt.captain_id,
+      tm.discord_id, p.standoff_nick, p.rating, p.wins, p.losses
+    FROM tournament_teams tt
+    JOIN tournament_team_members tm ON tm.team_id = tt.id
+    JOIN players p ON p.discord_id = tm.discord_id
+    WHERE tt.tournament_id = $1
+    ORDER BY tt.created_at, tm.joined_at
+  `, [tournamentId]);
+  return rows;
+}
+
 export async function getTournamentTeams(tournamentId) {
   const { rows } = await query(`
     SELECT tt.*, p.standoff_nick AS captain_nick,
