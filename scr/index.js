@@ -173,6 +173,12 @@ client.on(Events.InteractionCreate, async interaction => {
         }
       }
 
+      if (scope === 'mod') {
+        if (!isModerator(interaction)) return interaction.reply({ content: 'Недостаточно прав для модерации.', ephemeral: true });
+        if (!['warn', 'timeout', 'kick', 'ban'].includes(action)) return interaction.reply({ content: 'Неизвестное действие модерации.', ephemeral: true });
+        return interaction.showModal(moderationReasonModal(action, id));
+      }
+
       if (scope === 'custom' && action === 'new') {
         return interaction.reply({
           content: '⚔️ **Создание кастома**\n\nВыбери формат:',
