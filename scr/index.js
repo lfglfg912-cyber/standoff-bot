@@ -36,6 +36,7 @@ async function ensurePlayer(interaction) {
 
 const customDrafts = new Map();
 const tournamentTeamDrafts = new Map();
+const SECONDARY_PANEL_CHANNEL_ID = '1464922042624249877';
 
 async function showProfile(interaction) {
   const player = await ensurePlayer(interaction);
@@ -101,8 +102,18 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         await sendMainPanel(channel);
+
+        const secondary = await interaction.guild.channels.fetch(SECONDARY_PANEL_CHANNEL_ID).catch(() => null);
+        if (secondary?.isTextBased() && secondary.id !== channel.id) {
+          await sendMainPanel(secondary);
+        }
+
+        const targets = secondary?.isTextBased() && secondary.id !== channel.id
+          ? `<#${channel.id}> и <#${secondary.id}>`
+          : `<#${channel.id}>`;
+
         return interaction.reply({
-          content: `✅ Панель DOMINION опубликована в <#${channel.id}>.`,
+          content: `✅ Панель DOMINION опубликована в ${targets}.`,
           ephemeral: true
         });
       }
