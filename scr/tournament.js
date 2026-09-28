@@ -26,7 +26,7 @@ function matchLine(m) {
 
 export function tournamentsEmbed(tournaments) {
   const embed = new EmbedBuilder().setTitle('🏆 Турниры DOMINION').setDescription(tournaments.length ? 'Выбери турнир ниже.' : 'Сейчас активных турниров нет.').setColor(0x8b0000);
-  for (const t of tournaments) embed.addFields({ name:`#${t.id} · ${t.name}`, value:`Формат: **${t.format || '1v1'}** · ${t.status === 'registration' ? 'Регистрация' : 'Идёт'}\\n${(t.format || '1v1') === '1v1' ? 'Участники' : 'Команды'}: **${t.registered}/${t.slots}** · Раундов в матче: **${t.rounds_per_match || 10}** · Приз: **${t.prize_gold} G**` });
+  for (const t of tournaments) embed.addFields({ name:`#${t.id} · ${t.name}`, value:`Формат: **${t.format || '1v1'}** · ${t.status === 'registration' ? 'Регистрация' : 'Идёт'}\\n${(t.format || '1v1') === '1v1' ? 'Участники' : 'Команды'}: **${t.registered}/${t.slots}** · Раунды: **10 / 12 / 14 / 16 (голосование игроков)** · Приз: **${t.prize_gold} G**` });
   return embed;
 }
 export function tournamentButtons(ts) {
@@ -117,6 +117,6 @@ export async function matchesEmbed(discordId){
   const ms=await getPlayerOrCaptainMatches(discordId), embed=new EmbedBuilder().setTitle('🎮 Мои матчи').setColor(0x8b0000);
   if(!ms.length) return {embeds:[embed.setDescription('Матчей пока нет.')],components:[]};
   embed.setDescription(ms.map(m=>`**${m.tournament_name}** · раунд ${m.round}, матч ${m.match_no}\\n**${m.team1_name||m.player1_id}** vs **${m.team2_name||m.player2_id}** · ${m.status==='completed'?'завершён':m.status==='cancelled'?'🛑 отменён':m.selected_map?`карта ${m.selected_map}`:'бан карт'}`).join('\n\n'));
-  const components=[]; for(const m of ms.filter(x=>x.status!=='completed'&&x.status!=='cancelled'&&x.veto_status==='finished').slice(0,3)) components.push(...resultButtons(m));
+  const components=[]; for(const m of ms.filter(x=>x.status!=='completed'&&x.status!=='cancelled').slice(0,3)) { if(!m.rounds_selected) components.push(...roundVoteButtons(m.id,'round')); else if(m.veto_status==='finished') components.push(...resultButtons(m)); }
   return {embeds:[embed],components};
 }
