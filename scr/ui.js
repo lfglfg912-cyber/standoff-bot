@@ -28,12 +28,27 @@ export function mainPanel() {
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('nav:help').setLabel('❓ Как играть').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('nav:leaderboard').setLabel('🏅 Рейтинг').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('nav:invite').setLabel('📢 Пригласить').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('nav:admin').setLabel('⚙️ Управление').setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row1, row2] };
 }
 
+export function leaderboardEmbed(players) {
+  const medals = ['🥇', '🥈', '🥉'];
+  const lines = players.length
+    ? players.map((p, i) => {
+        const rank = medals[i] || '**' + (i + 1) + '.**';
+        return rank + ' <@' + p.discord_id + '> · **' + p.standoff_nick + '** — **' + p.rating + '** ⭐ · ' + p.wins + 'W/' + p.losses + 'L · ' + p.winrate + '% WR';
+      }).join('\n')
+    : 'Пока нет подтверждённых игроков.';
+  return new EmbedBuilder()
+    .setTitle('🏅 DOMINION · Лидерборд')
+    .setDescription(lines)
+    .setColor(0x8b0000)
+    .setFooter({ text: 'Рейтинг обновляется после завершённых матчей.' });
+}
 export function playMenuButtons() {
   return [new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Создать кастом').setStyle(ButtonStyle.Success),
