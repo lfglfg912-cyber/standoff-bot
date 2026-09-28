@@ -21,6 +21,15 @@ export async function query(text, params = []) {
 export async function initDb() {
   await query(`UPDATE players SET rating = 0 WHERE (COALESCE(wins, 0) + COALESCE(losses, 0)) < 5 AND rating = 1000;`);
   await query(`
+    CREATE TABLE IF NOT EXISTS moderation_warnings (
+      id BIGSERIAL PRIMARY KEY,
+      guild_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      moderator_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS players (
       discord_id TEXT PRIMARY KEY,
       standoff_nick TEXT NOT NULL,
@@ -88,6 +97,23 @@ export async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+}
+
+export async function addModerationWarning(guildId, userId, moderatorId, reason) {
+  const { rows } = await query(`
+    INSERT INTO moderation_warnings (guild_id, user_id, moderator_id, reason)
+    VALUES ($1, $2, $3, $4)
+    RETURNING id, created_at
+  `, [guildId, userId, moderatorId, reason]);
+  return rows[0];
+}
+
+export async function getModerationWarnings(guildId, userId) {
+  const { rows } = await query(
+    'SELECT * FROM moderation_warnings WHERE guild_id = $1 AND user_id = $2 ORDER BY created_at DESC',
+    [guildId, userId]
+  );
+  return rows;
 }
 
 export async function getPlayer(discordId) {
