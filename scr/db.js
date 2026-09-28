@@ -157,6 +157,29 @@ export async function listPlayers() {
   return rows;
 }
 
+export async function getLeaderboard(limit = 10) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 25));
+  const { rows } = await query(`
+    SELECT
+      discord_id,
+      standoff_nick,
+      rating,
+      wins,
+      losses,
+      tournaments,
+      CASE
+        WHEN (wins + losses) > 0 THEN ROUND((wins::numeric / (wins + losses)) * 100)
+        ELSE 0
+      END AS winrate,
+      (wins + losses) AS matches
+    FROM players
+    WHERE verified = TRUE
+    ORDER BY rating DESC, wins DESC, matches DESC, standoff_nick ASC
+    LIMIT $1
+  `, [safeLimit]);
+  return rows;
+}
+
 
 export async function getRatingHistory(discordId, limit = 10) {
   const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 25));
