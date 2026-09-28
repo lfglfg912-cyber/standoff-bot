@@ -26,7 +26,7 @@ function matchLine(m) {
 
 export function tournamentsEmbed(tournaments) {
   const embed = new EmbedBuilder().setTitle('🏆 Турниры DOMINION').setDescription(tournaments.length ? 'Выбери турнир ниже.' : 'Сейчас активных турниров нет.').setColor(0x8b0000);
-  for (const t of tournaments) embed.addFields({ name:`#${t.id} · ${t.name}`, value:`Формат: **${t.format || '1v1'}** · ${t.status === 'registration' ? 'Регистрация' : 'Идёт'}\\n${(t.format || '1v1') === '1v1' ? 'Участники' : 'Команды'}: **${t.registered}/${t.slots}** · Приз: **${t.prize_gold} G**` });
+  for (const t of tournaments) embed.addFields({ name:`#${t.id} · ${t.name}`, value:`Формат: **${t.format || '1v1'}** · ${t.status === 'registration' ? 'Регистрация' : 'Идёт'}\\n${(t.format || '1v1') === '1v1' ? 'Участники' : 'Команды'}: **${t.registered}/${t.slots}** · Раундов в матче: **${t.rounds_per_match || 10}** · Приз: **${t.prize_gold} G**` });
   return embed;
 }
 export function tournamentButtons(ts) {
