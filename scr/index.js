@@ -80,7 +80,7 @@ client.once(Events.ClientReady, async ready => {
   try {
     await initDb();
     await initTournamentV2Db();
-    console.log('[DOMINION] Database ready. Main panel is published with /panel.');
+    console.log('[DOMINION] Database ready. Main panel is available with /p.');
   } catch (error) {
     console.error('[DOMINION] Startup error:', error);
     process.exitCode = 1;
@@ -90,9 +90,9 @@ client.once(Events.ClientReady, async ready => {
 client.on(Events.InteractionCreate, async interaction => {
   try {
     if (interaction.isChatInputCommand()) {
-      if (interaction.commandName === 'panel') {
-        if (!isAdmin(interaction)) {
-          return interaction.reply({ content: '❌ Команда /panel доступна только администратору.', ephemeral: true });
+      if (interaction.commandName === 'p') {
+        if (!interaction.inGuild()) {
+          return interaction.reply({ content: '❌ Команду нужно использовать на сервере DOMINION.', ephemeral: true });
         }
 
         const channel = await interaction.guild.channels.fetch(process.env.PANEL_CHANNEL_ID).catch(() => null);
@@ -656,7 +656,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 await rest.put(Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID), {
-  body: [{ name: 'panel', description: 'Опубликовать/обновить панель DOMINION (админ)' }]
+  body: [{ name: 'p', description: 'Открыть панель DOMINION' }]
 });
 
 await client.login(process.env.DISCORD_TOKEN);
