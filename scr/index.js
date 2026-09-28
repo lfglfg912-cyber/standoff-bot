@@ -145,6 +145,21 @@ client.once(Events.ClientReady, async ready => {
 client.on(Events.InteractionCreate, async interaction => {
   try {
     if (interaction.isChatInputCommand()) {
+      if (interaction.commandName === 'invite') {
+        if (!interaction.inGuild()) return interaction.reply({ content: '❌ Команду нужно использовать на сервере DOMINION.', ephemeral: true });
+        if (!isModerator(interaction)) return interaction.reply({ content: '❌ Создавать приглашения может только администрация или модераторы.', ephemeral: true });
+        const channel = interaction.channel;
+        const permissions = channel?.permissionsFor(client.user);
+        if (!channel?.isTextBased() || !permissions?.has(PermissionsBitField.Flags.CreateInstantInvite)) {
+          return interaction.reply({ content: '❌ Боту нужно право **Создавать приглашения** в этом канале.', ephemeral: true });
+        }
+        const invite = await channel.createInvite({ maxAge: 0, maxUses: 0, unique: true, reason: 'DOMINION recruitment' });
+        return interaction.reply({
+          content: `📢 **Приглашение в DOMINION**\\n\\n⚔️ Standoff 2 · турниры · кастомные матчи · рейтинг\\n\\n${invite.url}\\n\\nОтправь эту ссылку друзьям или игрокам, которых хочешь позвать на сервер.`,
+          ephemeral: true
+        });
+      }
+
       if (interaction.commandName === 'p') {
         if (!interaction.inGuild()) {
           return interaction.reply({ content: '❌ Команду нужно использовать на сервере DOMINION.', ephemeral: true });
@@ -344,6 +359,19 @@ client.on(Events.InteractionCreate, async interaction => {
         }
         if (action === 'ai') {
           return interaction.reply({ content: '🤖 **ИИ временно недоступен.**\nФункция находится в разработке. Остальные функции DOMINION работают штатно.', ephemeral: true });
+        }
+        if (action === 'invite') {
+          if (!isModerator(interaction)) return interaction.reply({ content: '❌ Создавать приглашения может только администрация или модераторы.', ephemeral: true });
+          const channel = interaction.channel;
+          const permissions = channel?.permissionsFor(client.user);
+          if (!channel?.isTextBased() || !permissions?.has(PermissionsBitField.Flags.CreateInstantInvite)) {
+            return interaction.reply({ content: '❌ Боту нужно право **Создавать приглашения** в этом канале.', ephemeral: true });
+          }
+          const invite = await channel.createInvite({ maxAge: 0, maxUses: 0, unique: true, reason: 'DOMINION recruitment' });
+          return interaction.reply({
+            content: `📢 **Приглашение в DOMINION**\\n\\n⚔️ Standoff 2 · турниры · кастомные матчи · рейтинг\\n\\n${invite.url}\\n\\nОтправь ссылку друзьям или игрокам, которых хочешь позвать на сервер.`,
+            ephemeral: true
+          });
         }
         if (action === 'help') return interaction.reply({
           embeds: [new EmbedBuilder()
@@ -721,7 +749,10 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 await rest.put(Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID), {
-  body: [{ name: 'p', description: 'Открыть панель DOMINION' }]
+  body: [
+    { name: 'p', description: 'Открыть панель DOMINION' },
+    { name: 'invite', description: 'Получить приглашение на сервер DOMINION' }
+  ]
 });
 
 await client.login(process.env.DISCORD_TOKEN);
