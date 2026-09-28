@@ -423,7 +423,7 @@ export async function castMapVote(matchId, discordId, mapName) {
   finally { client.release(); }
 }
 
-async function applyCompetitiveResult(client, winnerIds, loserIds) {
+async function applyCompetitiveResult(client, winnerIds, loserIds, matchType = 'match', matchId = null) {
   const ids = [...new Set([...winnerIds, ...loserIds].filter(Boolean).map(String))];
   if (!ids.length) return;
 
@@ -449,8 +449,8 @@ async function applyCompetitiveResult(client, winnerIds, loserIds) {
     await client.query('UPDATE players SET wins=$1, rating=$2, updated_at=NOW() WHERE discord_id=$3', [wins, rating, id]);
     if (rating !== oldRating) {
       await client.query(
-        "INSERT INTO rating_history (discord_id, match_type, old_rating, new_rating, delta) VALUES ($1,'match',$2,$3,$4)",
-        [id, oldRating, rating, rating - oldRating]
+        "INSERT INTO rating_history (discord_id, match_type, match_id, old_rating, new_rating, delta) VALUES ($1,$2,$3,$4,$5,$6)",
+        [id, matchType, matchId, oldRating, rating, rating - oldRating]
       );
     }
   }
@@ -522,7 +522,7 @@ export async function reportMatchV2(matchId, reporterId, winnerId, winnerTeamId 
       "UPDATE matches SET winner_id=$1, winner_team_id=$2, status='completed', completed_at=NOW() WHERE id=$3",
       [winnerId, winnerTeamId, matchId]
     );
-    await applyCompetitiveResult(client, winnerIds, loserIds);
+    await applyCompetitiveResult(client, winnerIds, loserIds, 'tournament', matchId);
 
     const pending = await client.query(
       "SELECT 1 FROM matches WHERE tournament_id=$1 AND round=$2 AND status NOT IN ('completed','cancelled')",
@@ -646,7 +646,7 @@ export async function reportCustomGame(matchId, reporterId, winnerTeam) {
     const winners = Number(winnerTeam) === 1 ? team1 : team2;
     const losers = Number(winnerTeam) === 1 ? team2 : team1;
     await db.query("UPDATE custom_matches SET status='completed',winner_team=$1,completed_at=NOW() WHERE id=$2",[winnerTeam,matchId]);
-    await applyCompetitiveResult(db, winners, losers);
+    await applyCompetitiveResult(db, winners, losers, 'custom', matchId);
     await db.query('COMMIT');
     return true;
   } catch(error) {
