@@ -543,8 +543,9 @@ client.on(Events.InteractionCreate, async interaction => {
         const format = interaction.fields.getTextInputValue('format').trim().toLowerCase();
         const slots = Number(interaction.fields.getTextInputValue('slots').trim());
         const prize = Number(interaction.fields.getTextInputValue('prize').trim());
-        if (!TEAM_FORMATS[format] || ![4, 8, 16, 32].includes(slots) || !Number.isInteger(prize) || prize < 0) return interaction.reply({ content: 'Формат: 1v1/2v2/3v3/4v4/5v5. Слоты: 4/8/16/32. Приз — целое число.', ephemeral: true });
-        const t = await createTournamentV2({ name, format, slots, prizeGold: prize, createdBy: interaction.user.id });
+        const rounds = Number(interaction.fields.getTextInputValue('rounds').trim());
+        if (!TEAM_FORMATS[format] || ![4, 8, 16, 32].includes(slots) || !Number.isInteger(prize) || prize < 0 || !Number.isInteger(rounds) || rounds < 10 || rounds > 99) return interaction.reply({ content: 'Формат: 1v1/2v2/3v3/4v4/5v5. Слоты: 4/8/16/32. Раундов в матче: от 10 до 99. Приз — целое число.', ephemeral: true });
+        const t = await createTournamentV2({ name, format, slots, prizeGold: prize, roundsPerMatch: rounds, createdBy: interaction.user.id });
         return interaction.reply({ content: `✅ Турнир **${t.name}** создан (#${t.id}) в формате **${format}**.`, ephemeral: true });
       }
     }
@@ -556,6 +557,7 @@ client.on(Events.InteractionCreate, async interaction => {
       : error.message === 'MATCH_ALREADY_DONE' ? 'Этот матч уже завершён.'
       : error.message === 'TOURNAMENT_NOT_ACTIVE' ? 'Этот турнир уже не активен. Действие отменено.'
       : error.message === 'TOURNAMENT_NOT_FOUND' ? 'Турнир не найден.'
+      : error.message === 'INVALID_ROUNDS' ? 'Количество раундов в матче должно быть от 10 до 99.'
       : error.message === 'NOT_A_PLAYER' ? 'Ты не участник этого матча.'
       : error.message === 'ALREADY_VOTED' ? 'Ты уже проголосовал в этом раунде.'
       : error.message === 'VETO_NOT_FINISHED' ? 'Сначала завершите голосование по картам.'
