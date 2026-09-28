@@ -4,9 +4,9 @@ import {
   REST, Routes
 } from 'discord.js';
 import { initDb, getPlayer, upsertPlayer, listPlayers, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, clearModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, tournamentTeamNameModal, tournamentTeamSelection, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm } from './ui.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, tournamentTeamNameModal, tournamentTeamSelection, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm, roundVoteButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
-import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
+import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getRoundVoteState, castRoundVote, getCustomRoundVoteState, castCustomRoundVote, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 
 const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_GUILD_ID', 'PANEL_CHANNEL_ID', 'ADMIN_ROLE_ID'];
 for (const key of required) if (!process.env[key]) throw new Error(`Missing environment variable: ${key}`);
@@ -54,6 +54,12 @@ async function customGameView(id) {
     .setTitle(`⚔️ Кастом на звание #${m.id}`)
     .setDescription(`Формат: **${m.format}**\\nСтатус: **${m.status === 'completed' ? 'Завершён' : m.veto_status === 'finished' ? 'Матч готов' : 'Бан карт'}**\\nКарта: **${m.selected_map || 'ещё не выбрана'}**\\nКоманда 1: ${m.team1_ids.map(x => `<@${x}>`).join(', ')}\\nКоманда 2: ${m.team2_ids.map(x => `<@${x}>`).join(', ')}`)
     .setColor(0x8b0000);
+  if (!m.rounds_selected) {
+    const rv = await getCustomRoundVoteState(id);
+    const majority = Math.floor(rv.participants.length / 2) + 1;
+    embed.addFields({ name: '🗳️ Количество раундов', value: `Игроков: **${rv.participants.length}** · большинство: **${majority}**\\nПроголосовали: **${rv.votedPlayers.length}/${rv.participants.length}**\\nВарианты: **10 / 12 / 14 / 16**` });
+    return { embeds: [embed], components: roundVoteButtons(id, 'cround') };
+  }
   if (m.veto_status === 'active') {
     const majority = Math.floor(state.participants.length / 2) + 1;
     embed.addFields({ name: '🗳️ Голосование карт', value: `Игроков: **${state.participants.length}** · большинство: **${majority}**\\nПроголосовали: **${state.votedPlayers.length}/${state.participants.length}**\\nОсталось: **${(m.map_pool || []).filter(x => !state.bans.some(b => b.map_name === x)).join(', ')}**` });
@@ -451,6 +457,34 @@ client.on(Events.InteractionCreate, async interaction => {
       if (scope === 'admin' && action === 'create_tournament') {
         if (!isAdmin(interaction)) return interaction.reply({ content: 'Недостаточно прав.', ephemeral: true });
         return interaction.showModal(tournamentCreateModal());
+      }
+
+      if (scope === 'round' && action === 'vote') {
+        const rounds = Number(extra);
+        await castRoundVote(id, interaction.user.id, rounds);
+        const state = await getRoundVoteState(id);
+        if (state.match.rounds_selected) {
+          return interaction.reply({ content: `✅ Игроки выбрали **${state.match.rounds_selected} раундов** для этого матча.`, ephemeral: true });
+        }
+        const majority = Math.floor(state.participants.length / 2) + 1;
+        const votes = state.votes.length ? state.votes.map(v => `${v.rounds}: **${v.votes}**`).join(' · ') : 'голосов пока нет';
+        return interaction.update({
+          content: `🗳️ **Выбор количества раундов**\\nИгроков: **${state.participants.length}** · большинство: **${majority}**\\nПроголосовали: **${state.votedPlayers.length}/${state.participants.length}**\\nГолоса: ${votes}`,
+          components: roundVoteButtons(id, 'round')
+        });
+      }
+
+      if (scope === 'cround' && action === 'vote') {
+        const rounds = Number(extra);
+        await castCustomRoundVote(id, interaction.user.id, rounds);
+        const state = await getCustomRoundVoteState(id);
+        if (state.match.rounds_selected) return interaction.update(await customGameView(id));
+        const majority = Math.floor(state.participants.length / 2) + 1;
+        const votes = state.votes.length ? state.votes.map(v => `${v.rounds}: **${v.votes}**`).join(' · ') : 'голосов пока нет';
+        return interaction.update({
+          content: `🗳️ **Выбор количества раундов**\\nИгроков: **${state.participants.length}** · большинство: **${majority}**\\nПроголосовали: **${state.votedPlayers.length}/${state.participants.length}**\\nГолоса: ${votes}`,
+          components: roundVoteButtons(id, 'cround')
+        });
       }
 
       if (scope === 'veto' && action === 'vote') {
