@@ -290,6 +290,17 @@ export async function startTournamentV2(tournamentId) {
         tournamentId, i / 2 + 1, a.id, b.id, a.teamId, b.teamId, MAP_POOL
       ]);
     }
+    if (format === '1v1') {
+      await client.query(
+        'UPDATE players SET tournaments=tournaments+1, updated_at=NOW() WHERE discord_id IN (SELECT discord_id FROM tournament_players WHERE tournament_id=$1)',
+        [tournamentId]
+      );
+    } else {
+      await client.query(
+        'UPDATE players SET tournaments=tournaments+1, updated_at=NOW() WHERE discord_id IN (SELECT tm.discord_id FROM tournament_team_members tm JOIN tournament_teams tt ON tt.id=tm.team_id WHERE tt.tournament_id=$1)',
+        [tournamentId]
+      );
+    }
     await client.query("UPDATE tournaments SET status = 'running', started_at = NOW() WHERE id = $1", [tournamentId]);
     await client.query('COMMIT');
   } catch (error) {
