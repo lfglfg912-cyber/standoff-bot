@@ -614,8 +614,7 @@ export async function reportCustomGame(matchId, reporterId, winnerTeam) {
     const winners = Number(winnerTeam) === 1 ? team1 : team2;
     const losers = Number(winnerTeam) === 1 ? team2 : team1;
     await db.query("UPDATE custom_matches SET status='completed',winner_team=$1,completed_at=NOW() WHERE id=$2",[winnerTeam,matchId]);
-    await db.query('UPDATE players SET wins=wins+1,rating=rating+15,updated_at=NOW() WHERE discord_id=ANY($1::text[])',[winners]);
-    await db.query('UPDATE players SET losses=losses+1,rating=GREATEST(0,rating-10),updated_at=NOW() WHERE discord_id=ANY($1::text[])',[losers]);
+    await applyCompetitiveResult(db, winners, losers);
     await db.query('COMMIT');
     return true;
   } catch(error) {
