@@ -4,7 +4,7 @@ import {
   REST, Routes
 } from 'discord.js';
 import { initDb, getPlayer, upsertPlayer, listPlayers, listTournaments, addModerationWarning, getModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal } from './ui.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, tournamentCancelConfirm } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
@@ -276,10 +276,33 @@ client.on(Events.InteractionCreate, async interaction => {
           await startTournamentV2(id);
           return interaction.update(await tournamentView(id, isAdmin(interaction)));
         }
+        if (action === 'cancel' && id === 'confirm') {
+          if (!isAdmin(interaction)) return interaction.reply({ content: 'Отменить турнир может только администрация.', ephemeral: true });
+          const tournamentId = extra;
+          const t = await getTournamentV2(tournamentId);
+          if (!t) return interaction.reply({ content: '❌ Турнир не найден.', ephemeral: true });
+          if (!['registration', 'running'].includes(t.status)) return interaction.reply({ content: '❌ Этот турнир уже нельзя отменить.', ephemeral: true });
+          await cancelTournamentV2(tournamentId, interaction.user.id, 'Отменён администрацией');
+          return interaction.update({
+            content: `🛑 **Турнир #${tournamentId} отменён.**\\n\\nВсе текущие матчи этого турнира больше не могут считаться активными.`,
+            embeds: [],
+            components: []
+          });
+        }
+        if (action === 'cancel' && id === 'back') {
+          const tournamentId = extra;
+          return interaction.update(await tournamentView(tournamentId, isAdmin(interaction)));
+        }
         if (action === 'cancel') {
           if (!isAdmin(interaction)) return interaction.reply({ content: 'Отменить турнир может только администрация.', ephemeral: true });
-          await cancelTournamentV2(id);
-          return interaction.update({ content: `🛑 Турнир **#${id}** отменён администрацией.`, embeds: [], components: [] });
+          const t = await getTournamentV2(id);
+          if (!t) return interaction.reply({ content: '❌ Турнир не найден.', ephemeral: true });
+          if (!['registration', 'running'].includes(t.status)) return interaction.reply({ content: '❌ Этот турнир уже нельзя отменить.', ephemeral: true });
+          return interaction.update({
+            content: `⚠️ **Отмена турнира #${id}**\\n\\nТы действительно хочешь отменить **${t.name}**?\\n\\nЭто действие остановит турнир и уберёт его из списка активных.`,
+            embeds: [],
+            components: tournamentCancelConfirm(id)
+          });
         }
       }
 
