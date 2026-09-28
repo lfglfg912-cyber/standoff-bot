@@ -22,7 +22,11 @@ function isAdmin(interaction) {
 
 function isModerator(interaction) {
   if (!interaction.inGuild()) return false;
+  const hasModeratorRole = interaction.member.roles.cache.some(role =>
+    role.name === 'Moderator' || role.name === '🛡 Moderator'
+  );
   return isAdmin(interaction)
+    || hasModeratorRole
     || interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)
     || interaction.member.permissions.has(PermissionsBitField.Flags.KickMembers)
     || interaction.member.permissions.has(PermissionsBitField.Flags.BanMembers);
