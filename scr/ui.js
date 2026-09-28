@@ -317,6 +317,15 @@ export function moderationReasonModal(action, userId) {
     ));
 }
 
+export function tournamentCancelConfirm(tournamentId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`t:cancel:confirm:${tournamentId}`).setLabel('🛑 Да, отменить турнир').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`t:cancel:back:${tournamentId}`).setLabel('↩️ Вернуться').setStyle(ButtonStyle.Secondary)
+    )
+  ];
+}
+
 export function tournamentCreateModal() {
   return new ModalBuilder().setCustomId('admin:create_tournament_modal').setTitle('Создать турнир').addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('name').setLabel('Название').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(60)),
