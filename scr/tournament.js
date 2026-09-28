@@ -20,7 +20,7 @@ export async function tournamentView(id, canManage = false) {
   if(teams.length) embed.addFields({name:'👥 Команды',value:teams.slice(0,20).map((x,i)=>`${i+1}. **${x.name}** — капитан <@${x.captain_id}> — ${x.member_count}/${TEAM_FORMATS[format]}`).join('\n')});
   const components=[];
   if(matches.length){
-    const active=matches.filter(m=>m.status!=='completed');
+    const active=matches.filter(m=>m.status!=='completed' && m.status!=='cancelled');
     if(active.length) embed.addFields({name:'🎮 Текущие матчи',value:active.slice(0,10).map(m=>`Раунд ${m.round}, матч ${m.match_no}: **${m.team1_name||m.player1_nick}** vs **${m.team2_name||m.player2_nick}** · ${m.selected_map?`🗺️ **${m.selected_map}**`:'🚫 Бан карт'}`).join('\n')});
     const done=matches.filter(m=>m.status==='completed');
     if(done.length) embed.addFields({name:'✅ Завершённые',value:done.slice(-8).reverse().map(m=>`Раунд ${m.round}, матч ${m.match_no}: **${m.winner_team_name||m.winner_nick||'победитель'}**`).join('\n')});
@@ -55,7 +55,7 @@ export async function tournamentView(id, canManage = false) {
 export async function matchesEmbed(discordId){
   const ms=await getPlayerOrCaptainMatches(discordId), embed=new EmbedBuilder().setTitle('🎮 Мои матчи').setColor(0x8b0000);
   if(!ms.length) return {embeds:[embed.setDescription('Матчей пока нет.')],components:[]};
-  embed.setDescription(ms.map(m=>`**${m.tournament_name}** · раунд ${m.round}, матч ${m.match_no}\\n**${m.team1_name||m.player1_id}** vs **${m.team2_name||m.player2_id}** · ${m.status==='completed'?'завершён':m.selected_map?`карта ${m.selected_map}`:'бан карт'}`).join('\n\n'));
-  const components=[]; for(const m of ms.filter(x=>x.status!=='completed'&&x.veto_status==='finished').slice(0,3)) components.push(...resultButtons(m));
+  embed.setDescription(ms.map(m=>`**${m.tournament_name}** · раунд ${m.round}, матч ${m.match_no}\\n**${m.team1_name||m.player1_id}** vs **${m.team2_name||m.player2_id}** · ${m.status==='completed'?'завершён':m.status==='cancelled'?'🛑 отменён':m.selected_map?`карта ${m.selected_map}`:'бан карт'}`).join('\n\n'));
+  const components=[]; for(const m of ms.filter(x=>x.status!=='completed'&&x.status!=='cancelled'&&x.veto_status==='finished').slice(0,3)) components.push(...resultButtons(m));
   return {embeds:[embed],components};
 }
