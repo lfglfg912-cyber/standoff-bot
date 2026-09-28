@@ -159,6 +159,17 @@ client.on(Events.InteractionCreate, async interaction => {
         });
       }
 
+      if (interaction.commandName === 'leaderboard') {
+        const players = await getLeaderboard(10);
+        return interaction.reply({ embeds: [leaderboardEmbed(players)], ephemeral: true });
+      }
+
+      if (interaction.commandName === 'stats') {
+        const player = await getPlayer(interaction.user.id);
+        if (!player) return interaction.reply({ content: '👋 Сначала создай профиль DOMINION через /p → 👤 Профиль.', ephemeral: true });
+        return interaction.reply({ embeds: [profileStatsEmbed(player)], ephemeral: true });
+      }
+
       if (interaction.commandName === 'p') {
         if (!interaction.inGuild()) {
           return interaction.reply({ content: '❌ Команду нужно использовать на сервере DOMINION.', ephemeral: true });
@@ -753,7 +764,9 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 await rest.put(Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID), {
   body: [
     { name: 'p', description: 'Открыть панель DOMINION' },
-    { name: 'invite', description: 'Получить приглашение на сервер DOMINION' }
+    { name: 'invite', description: 'Получить приглашение на сервер DOMINION' },
+    { name: 'leaderboard', description: 'Показать топ игроков DOMINION' },
+    { name: 'stats', description: 'Показать свою статистику DOMINION' }
   ]
 });
 
