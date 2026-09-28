@@ -30,6 +30,17 @@ export async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS rating_history (
+      id BIGSERIAL PRIMARY KEY,
+      discord_id TEXT NOT NULL REFERENCES players(discord_id) ON DELETE CASCADE,
+      match_type TEXT NOT NULL DEFAULT 'match',
+      match_id BIGINT,
+      old_rating INTEGER NOT NULL,
+      new_rating INTEGER NOT NULL,
+      delta INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
     CREATE TABLE IF NOT EXISTS players (
       discord_id TEXT PRIMARY KEY,
       standoff_nick TEXT NOT NULL,
