@@ -1,6 +1,6 @@
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder,
-  ModalBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder, StringSelectMenuBuilder
+  ModalBuilder, TextInputBuilder, TextInputStyle, AttachmentBuilder, StringSelectMenuBuilder, UserSelectMenuBuilder
 } from 'discord.js';
 import sharp from 'sharp';
 
@@ -272,14 +272,49 @@ export function aiModal() {
 }
 
 export function adminPanel() {
-  const embed = new EmbedBuilder().setTitle('⚙️ Управление DOMINION').setDescription('Админские действия доступны кнопками.').setColor(0x8b0000);
+  const embed = new EmbedBuilder()
+    .setTitle('⚙️ Управление DOMINION')
+    .setDescription('Админские действия доступны кнопками.\n\n🛡️ **Модерация:** предупреждение, тайм-аут, кик и бан.')
+    .setColor(0x8b0000);
   return {
     embeds: [embed],
-    components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('admin:create_tournament').setLabel('➕ Создать турнир').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId('nav:tournaments').setLabel('🏆 Список турниров').setStyle(ButtonStyle.Secondary)
-    )]
+    components: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('admin:moderation').setLabel('🛡️ Модерация').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('admin:create_tournament').setLabel('➕ Создать турнир').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId('nav:tournaments').setLabel('🏆 Список турниров').setStyle(ButtonStyle.Secondary)
+      )
+    ]
   };
+}
+
+export function moderationUserSelect() {
+  return [new ActionRowBuilder().addComponents(
+    new UserSelectMenuBuilder()
+      .setCustomId('mod:user')
+      .setPlaceholder('Выбери участника для модерации')
+      .setMinValues(1).setMaxValues(1)
+  )];
+}
+
+export function moderationActions(userId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`mod:warn:${userId}`).setLabel('⚠️ Предупредить').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`mod:timeout:${userId}`).setLabel('🔇 Тайм-аут 10м').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`mod:kick:${userId}`).setLabel('👢 Кик').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`mod:ban:${userId}`).setLabel('🔨 Бан').setStyle(ButtonStyle.Danger)
+    )
+  ];
+}
+
+export function moderationReasonModal(action, userId) {
+  return new ModalBuilder()
+    .setCustomId(`mod:reason:${action}:${userId}`)
+    .setTitle('Причина модерации')
+    .addComponents(new ActionRowBuilder().addComponents(
+      new TextInputBuilder().setCustomId('reason').setLabel('Причина').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(500)
+    ));
 }
 
 export function tournamentCreateModal() {
