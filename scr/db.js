@@ -54,6 +54,10 @@ export async function initDb() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE UNIQUE INDEX IF NOT EXISTS rating_history_match_player_unique
+      ON rating_history (match_type, match_id, discord_id)
+      WHERE match_id IS NOT NULL;
+
     CREATE TABLE IF NOT EXISTS tournaments (
       id BIGSERIAL PRIMARY KEY,
       name TEXT NOT NULL,
