@@ -251,8 +251,27 @@ export function customGameButtons(game) {
 
 export function customResultButtons(game) {
   return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`custom:win:${game.id}:team:1`).setLabel('🏆 Победила команда 1').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(`custom:win:${game.id}:team:2`).setLabel('🏆 Победила команда 2').setStyle(ButtonStyle.Success)
+    new ButtonBuilder().setCustomId(`custom:score:${game.id}:team:1`).setLabel('🏆 Команда 1 · ввести счёт').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`custom:score:${game.id}:team:2`).setLabel('🏆 Команда 2 · ввести счёт').setStyle(ButtonStyle.Success)
+  )];
+}
+
+export function resultScoreModal(scope, matchId, winnerType, winnerValue) {
+  return new ModalBuilder().setCustomId(`${scope}:score:${matchId}:${winnerType}:${winnerValue}`).setTitle('Результат матча').addComponents(
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('score1').setLabel('Счёт игрока/команды 1').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('score2').setLabel('Счёт игрока/команды 2').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3))
+  );
+}
+
+export function resultButtons(match, scope = 'match') {
+  const isTeam = Boolean(match.team1_id && match.team2_id);
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(isTeam
+      ? `${scope}:score:${match.id}:team:${match.team1_id}`
+      : `match:score:${match.id}:player:${match.player1_id}`).setLabel(isTeam ? '🏆 Команда 1 · счёт' : '🏆 Игрок 1 · счёт').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(isTeam
+      ? `${scope}:score:${match.id}:team:${match.team2_id}`
+      : `match:score:${match.id}:player:${match.player2_id}`).setLabel(isTeam ? '🏆 Команда 2 · счёт' : '🏆 Игрок 2 · счёт').setStyle(ButtonStyle.Success)
   )];
 }
 
