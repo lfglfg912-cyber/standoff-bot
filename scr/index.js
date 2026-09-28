@@ -261,7 +261,7 @@ client.on(Events.InteractionCreate, async interaction => {
         if (action === 'join') {
           if (!await getPlayer(interaction.user.id)) return interaction.reply({ content: 'Сначала создай профиль через 👤 Профиль.', ephemeral: true });
           await joinTournament(id, interaction.user.id);
-          return interaction.update(await tournamentView(id));
+          return interaction.update(await tournamentView(id, isAdmin(interaction)));
         }
         if (action === 'team') {
           const t = await getTournamentV2(id);
@@ -274,7 +274,12 @@ client.on(Events.InteractionCreate, async interaction => {
         if (action === 'start') {
           if (!isAdmin(interaction)) return interaction.reply({ content: 'Запустить турнир может только администрация.', ephemeral: true });
           await startTournamentV2(id);
-          return interaction.update(await tournamentView(id));
+          return interaction.update(await tournamentView(id, isAdmin(interaction)));
+        }
+        if (action === 'cancel') {
+          if (!isAdmin(interaction)) return interaction.reply({ content: 'Отменить турнир может только администрация.', ephemeral: true });
+          await cancelTournamentV2(id);
+          return interaction.update({ content: `🛑 Турнир **#${id}** отменён администрацией.`, embeds: [], components: [] });
         }
       }
 
