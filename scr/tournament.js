@@ -12,7 +12,7 @@ export function tournamentButtons(ts) {
   for(const t of ts.slice(0,5)) row.addComponents(new ButtonBuilder().setCustomId(`t:view:${t.id}`).setLabel(`#${t.id}`).setStyle(ButtonStyle.Secondary));
   return row.components.length?[row]:[];
 }
-export async function tournamentView(id) {
+export async function tournamentView(id, canManage = false) {
   const t=await getTournamentV2(id); if(!t) return {content:'Турнир не найден.',components:[]};
   const format=t.format||'1v1', teams=format==='1v1'?[]:await getTournamentTeams(id), matches=t.status==='registration'?[]:await getTournamentMatchesV2(id);
   const embed=new EmbedBuilder().setTitle(`🏆 ${t.name}`).setDescription(`Формат: **${format}**\\nУчастники: **${t.registered}/${t.slots}**\\nПриз: **${t.prize_gold} G**\\nСтатус: **${t.status==='registration'?'Регистрация':t.status==='running'?'В процессе':'Завершён'}**`).setColor(0x8b0000);
@@ -29,6 +29,7 @@ export async function tournamentView(id) {
     if(format==='1v1') row.addComponents(new ButtonBuilder().setCustomId(`t:join:${id}`).setLabel('🎮 Участвовать').setStyle(ButtonStyle.Success));
     else row.addComponents(new ButtonBuilder().setCustomId(`t:team:${id}`).setLabel(`👑 Зарегистрировать команду ${format}`).setStyle(ButtonStyle.Success));
     if(t.registered===t.slots) row.addComponents(new ButtonBuilder().setCustomId(`t:start:${id}`).setLabel('⚔️ Запустить').setStyle(ButtonStyle.Danger));
+    if(canManage) row.addComponents(new ButtonBuilder().setCustomId(`t:cancel:${id}`).setLabel('🛑 Отменить').setStyle(ButtonStyle.Danger));
     row.addComponents(new ButtonBuilder().setCustomId(`t:refresh:${id}`).setLabel('🔄').setStyle(ButtonStyle.Secondary)); components.push(row);
   }
   for(const m of matches.filter(x=>x.status!=='completed').slice(0,3)){
