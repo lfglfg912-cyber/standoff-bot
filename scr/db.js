@@ -19,8 +19,8 @@ export async function query(text, params = []) {
 }
 
 export async function initDb() {
-  await query(`UPDATE players SET rating = 0 WHERE (COALESCE(wins, 0) + COALESCE(losses, 0)) < 5 AND rating = 1000;`);
   await query(`
+
     CREATE TABLE IF NOT EXISTS moderation_warnings (
       id BIGSERIAL PRIMARY KEY,
       guild_id TEXT NOT NULL,
@@ -96,6 +96,14 @@ export async function initDb() {
       response TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    UPDATE players
+    SET rating = 0, updated_at = NOW()
+    WHERE (COALESCE(wins, 0) + COALESCE(losses, 0)) < 5 AND rating = 1000;
+
+    UPDATE players
+    SET rating = 1000, updated_at = NOW()
+    WHERE (COALESCE(wins, 0) + COALESCE(losses, 0)) >= 5 AND rating = 0;
   `);
 }
 
