@@ -147,21 +147,6 @@ client.on(Events.InteractionCreate, async interaction => {
     if (interaction.isChatInputCommand()) {
       if (interaction.commandName === 'invite') {
         if (!interaction.inGuild()) return interaction.reply({ content: '❌ Команду нужно использовать на сервере DOMINION.', ephemeral: true });
-        if (!isModerator(interaction)) return interaction.reply({ content: '❌ Создавать приглашения может только администрация или модераторы.', ephemeral: true });
-        const channel = interaction.channel;
-        const permissions = channel?.permissionsFor(client.user);
-        if (!channel?.isTextBased() || !permissions?.has(PermissionsBitField.Flags.CreateInstantInvite)) {
-          return interaction.reply({ content: '❌ Боту нужно право **Создавать приглашения** в этом канале.', ephemeral: true });
-        }
-        const invite = await channel.createInvite({ maxAge: 0, maxUses: 0, unique: true, reason: 'DOMINION recruitment' });
-        return interaction.reply({
-          content: `📢 **Приглашение в DOMINION**\\n\\n⚔️ Standoff 2 · турниры · кастомные матчи · рейтинг\\n\\n${invite.url}\\n\\nОтправь эту ссылку друзьям или игрокам, которых хочешь позвать на сервер.`,
-          ephemeral: true
-        });
-      }
-
-      if (interaction.commandName === 'invite') {
-        if (!interaction.inGuild()) return interaction.reply({ content: '❌ Команду нужно использовать на сервере DOMINION.', ephemeral: true });
         const channel = interaction.channel;
         const permissions = channel?.permissionsFor(client.user);
         if (!channel?.isTextBased() || !permissions?.has(PermissionsBitField.Flags.CreateInstantInvite)) {
