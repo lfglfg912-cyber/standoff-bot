@@ -4,7 +4,7 @@ import { resultButtons, vetoButtons } from './ui.js';
 
 export function tournamentsEmbed(tournaments) {
   const embed = new EmbedBuilder().setTitle('🏆 Турниры DOMINION').setDescription(tournaments.length ? 'Выбери турнир ниже.' : 'Сейчас активных турниров нет.').setColor(0x8b0000);
-  for (const t of tournaments) embed.addFields({ name:`#${t.id} · ${t.name}`, value:`Формат: **${t.format || '1v1'}** · ${t.status === 'registration' ? 'Регистрация' : 'Идёт'}\\nУчастники: **${t.registered}/${t.slots}** · Приз: **${t.prize_gold} G**` });
+  for (const t of tournaments) embed.addFields({ name:`#${t.id} · ${t.name}`, value:`Формат: **${t.format || '1v1'}** · ${t.status === 'registration' ? 'Регистрация' : 'Идёт'}\\n${(t.format || '1v1') === '1v1' ? 'Участники' : 'Команды'}: **${t.registered}/${t.slots}** · Приз: **${t.prize_gold} G**` });
   return embed;
 }
 export function tournamentButtons(ts) {
@@ -19,7 +19,7 @@ export async function tournamentView(id, canManage = false) {
   const embed=new EmbedBuilder().setTitle(`🏆 ${t.name}`).setDescription(`Формат: **${format}**\\nУчастники: **${t.registered}/${t.slots}**\\nПриз: **${t.prize_gold} G**\\nСтатус: **${statusLabel}**`).setColor(0x8b0000);
   if(teams.length) {
     const members = await getTournamentTeamMembersWithStats(id);
-    const teamLines = teams.slice(0,20).map((team,i) => {
+    const teamLines = teams.slice(0,10).map((team,i) => {
       const roster = members.filter(m => String(m.team_id) === String(team.id));
       const players = roster.map(m => {
         const captain = String(m.discord_id) === String(team.captain_id) ? ' 👑' : '';
