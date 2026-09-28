@@ -14,7 +14,7 @@ export function mainPanel() {
       { name: '🏆 Турниры', value: 'Регистрация, сетки и матчи', inline: true },
       { name: '👤 Профиль', value: 'Твой рейтинг и статистика', inline: true },
       { name: '🎮 Матчи', value: 'Текущие и завершённые игры', inline: true },
-      { name: '🤖 AI', value: 'Помощник DOMINION', inline: true }
+      { name: '🤖 AI', value: 'Скоро будет доступен', inline: true }
     )
     .setColor(0x8b0000)
     .setFooter({ text: 'DOMINION · Skill. Discipline. Domination.' });
@@ -24,7 +24,7 @@ export function mainPanel() {
     new ButtonBuilder().setCustomId('nav:tournaments').setLabel('🏆 Турниры').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Кастом').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('nav:matches').setLabel('🎮 Мои матчи').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('nav:ai').setLabel('🤖 AI-помощник').setStyle(ButtonStyle.Success)
+    new ButtonBuilder().setCustomId('nav:ai').setLabel('🤖 AI (скоро)').setStyle(ButtonStyle.Secondary)
   );
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('nav:help').setLabel('❓ Как это работает').setStyle(ButtonStyle.Secondary),
