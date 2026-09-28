@@ -69,6 +69,17 @@ export async function initTournamentV2Db() {
       completed_at TIMESTAMPTZ
     );
 
+    ALTER TABLE custom_matches ADD COLUMN IF NOT EXISTS rounds_selected INTEGER;
+
+    CREATE TABLE IF NOT EXISTS custom_match_round_votes (
+      id BIGSERIAL PRIMARY KEY,
+      match_id BIGINT NOT NULL REFERENCES custom_matches(id) ON DELETE CASCADE,
+      discord_id TEXT NOT NULL REFERENCES players(discord_id) ON DELETE CASCADE,
+      rounds INTEGER NOT NULL CHECK (rounds IN (10,12,14,16)),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(match_id, discord_id)
+    );
+
     CREATE TABLE IF NOT EXISTS custom_match_map_votes (
       id BIGSERIAL PRIMARY KEY,
       match_id BIGINT NOT NULL REFERENCES custom_matches(id) ON DELETE CASCADE,
@@ -659,6 +670,47 @@ export async function getCustomGameState(matchId) {
   const participants = [...new Set([...(match.team1_ids || []), ...(match.team2_ids || [])])];
   const votedPlayers = await query('SELECT discord_id,map_name FROM custom_match_map_votes WHERE match_id=$1 AND veto_round=$2', [matchId, match.veto_round || 1]);
   return { match, bans: bans.rows, votes: votes.rows, participants, votedPlayers: votedPlayers.rows };
+}
+
+export async function getCustomRoundVoteState(matchId) {
+  const result = await query('SELECT * FROM custom_matches WHERE id=$1', [matchId]);
+  if (!result.rows[0]) throw new Error('CUSTOM_NOT_FOUND');
+  const match = result.rows[0];
+  const participants = [...new Set([...(match.team1_ids || []), ...(match.team2_ids || [])])];
+  const votes = await query('SELECT rounds,COUNT(*)::int AS votes FROM custom_match_round_votes WHERE match_id=$1 GROUP BY rounds ORDER BY votes DESC,rounds', [matchId]);
+  const voted = await query('SELECT discord_id FROM custom_match_round_votes WHERE match_id=$1', [matchId]);
+  return { match, participants, votes: votes.rows, votedPlayers: voted.rows.map(x=>x.discord_id) };
+}
+
+export async function castCustomRoundVote(matchId, discordId, rounds) {
+  const pool = (await import('./db.js')).pool;
+  const db = await pool.connect();
+  try {
+    await db.query('BEGIN');
+    const result = await db.query('SELECT * FROM custom_matches WHERE id=$1 FOR UPDATE', [matchId]);
+    const match = result.rows[0];
+    if (!match) throw new Error('CUSTOM_NOT_FOUND');
+    if (match.status === 'completed') throw new Error('MATCH_ALREADY_DONE');
+    if (![10,12,14,16].includes(Number(rounds))) throw new Error('INVALID_ROUNDS');
+    const participants = [...new Set([...(match.team1_ids || []), ...(match.team2_ids || [])])];
+    if (!participants.includes(discordId)) throw new Error('NOT_A_PLAYER');
+    if (match.rounds_selected) throw new Error('ROUNDS_ALREADY_SELECTED');
+    const existing = await db.query('SELECT 1 FROM custom_match_round_votes WHERE match_id=$1 AND discord_id=$2', [matchId,discordId]);
+    if (existing.rows.length) throw new Error('ALREADY_VOTED');
+    await db.query('INSERT INTO custom_match_round_votes(match_id,discord_id,rounds) VALUES($1,$2,$3)', [matchId,discordId,rounds]);
+    const counts = await db.query('SELECT rounds,COUNT(*)::int AS votes FROM custom_match_round_votes WHERE match_id=$1 GROUP BY rounds ORDER BY votes DESC,rounds', [matchId]);
+    const majority = Math.floor(participants.length / 2) + 1;
+    const totalVotes = counts.rows.reduce((s,x)=>s+x.votes,0);
+    let selected = counts.rows.find(x=>x.votes >= majority)?.rounds;
+    if (!selected && totalVotes >= participants.length) selected = counts.rows[0]?.rounds;
+    if (selected) {
+      await db.query('UPDATE custom_matches SET rounds_selected=$1 WHERE id=$2', [selected,matchId]);
+      await db.query('DELETE FROM custom_match_round_votes WHERE match_id=$1', [matchId]);
+    }
+    await db.query('COMMIT');
+    return getCustomRoundVoteState(matchId);
+  } catch(error) { await db.query('ROLLBACK'); throw error; }
+  finally { db.release(); }
 }
 
 export async function castCustomMapVote(matchId, discordId, mapName) {
