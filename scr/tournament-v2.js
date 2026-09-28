@@ -118,7 +118,7 @@ function normalizeFormat(format) {
 export async function createTournamentV2({ name, slots, prizeGold, createdBy, format, roundsPerMatch }) {
   const normalized = normalizeFormat(format);
   if (![4, 8, 16, 32].includes(slots)) throw new Error('INVALID_SLOTS');
-  if (!Number.isInteger(roundsPerMatch) || roundsPerMatch < 10 || roundsPerMatch > 99) throw new Error('INVALID_ROUNDS');
+  if (![10, 12, 14, 16].includes(roundsPerMatch)) throw new Error('INVALID_ROUNDS');
   const { rows } = await query(`
     INSERT INTO tournaments (name, slots, prize_gold, format, rounds_per_match, created_by)
     VALUES ($1, $2, $3, $4, $5, $6)
