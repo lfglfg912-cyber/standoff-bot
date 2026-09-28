@@ -15,7 +15,8 @@ export function tournamentButtons(ts) {
 export async function tournamentView(id, canManage = false) {
   const t=await getTournamentV2(id); if(!t) return {content:'Турнир не найден.',components:[]};
   const format=t.format||'1v1', teams=format==='1v1'?[]:await getTournamentTeams(id), matches=t.status==='registration'?[]:await getTournamentMatchesV2(id);
-  const embed=new EmbedBuilder().setTitle(`🏆 ${t.name}`).setDescription(`Формат: **${format}**\\nУчастники: **${t.registered}/${t.slots}**\\nПриз: **${t.prize_gold} G**\\nСтатус: **${t.status==='registration'?'Регистрация':t.status==='running'?'В процессе':'Завершён'}**`).setColor(0x8b0000);
+  const statusLabel = t.status === 'registration' ? 'Регистрация' : t.status === 'running' ? 'В процессе' : t.status === 'cancelled' ? 'Отменён' : 'Завершён';
+  const embed=new EmbedBuilder().setTitle(`🏆 ${t.name}`).setDescription(`Формат: **${format}**\\nУчастники: **${t.registered}/${t.slots}**\\nПриз: **${t.prize_gold} G**\\nСтатус: **${statusLabel}**`).setColor(0x8b0000);
   if(teams.length) embed.addFields({name:'👥 Команды',value:teams.slice(0,20).map((x,i)=>`${i+1}. **${x.name}** — капитан <@${x.captain_id}> — ${x.member_count}/${TEAM_FORMATS[format]}`).join('\n')});
   const components=[];
   if(matches.length){
@@ -31,8 +32,13 @@ export async function tournamentView(id, canManage = false) {
     if(t.registered===t.slots) row.addComponents(new ButtonBuilder().setCustomId(`t:start:${id}`).setLabel('⚔️ Запустить').setStyle(ButtonStyle.Danger));
     if(canManage) row.addComponents(new ButtonBuilder().setCustomId(`t:cancel:${id}`).setLabel('🛑 Отменить').setStyle(ButtonStyle.Danger));
     row.addComponents(new ButtonBuilder().setCustomId(`t:refresh:${id}`).setLabel('🔄').setStyle(ButtonStyle.Secondary)); components.push(row);
+  } else if(t.status==='running' && canManage){
+    components.push(new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`t:cancel:${id}`).setLabel('🛑 Отменить турнир').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`t:refresh:${id}`).setLabel('🔄 Обновить').setStyle(ButtonStyle.Secondary)
+    ));
   }
-  for(const m of matches.filter(x=>x.status!=='completed').slice(0,3)){
+  for(const m of matches.filter(x=>x.status!=='completed' && x.status!=='cancelled').slice(0,3)){
     const state=await getVetoState(m.id);
     if(state.match.veto_status==='active'){
       const banned=state.bans, remaining=(state.match.map_pool||[]).filter(x=>!banned.some(b=>b.map_name===x));
