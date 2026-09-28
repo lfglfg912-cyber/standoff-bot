@@ -9,28 +9,37 @@ import sharp from 'sharp';
 export function mainPanel() {
   const embed = new EmbedBuilder()
     .setTitle('⚔️ DOMINION | STANDOFF 2')
-    .setDescription('**Турнирная система нового поколения.**\n\nВыбирай действие кнопками — команды знать не нужно.')
+    .setDescription('**Начни здесь:** создай профиль → выбери игру → играй.\n\nНикаких команд запоминать не нужно — всё делается кнопками.')
     .addFields(
-      { name: '🏆 Турниры', value: 'Регистрация, сетки и матчи', inline: true },
-      { name: '👤 Профиль', value: 'Твой рейтинг и статистика', inline: true },
-      { name: '🎮 Матчи', value: 'Текущие и завершённые игры', inline: true },
-      { name: '🤖 AI', value: 'Скоро будет доступен', inline: true }
+      { name: '🚀 Играть', value: 'Создать кастом или найти турнир', inline: true },
+      { name: '👤 Профиль', value: 'Ник, ID, рейтинг и статистика', inline: true },
+      { name: '🎮 Матчи', value: 'Твои текущие игры', inline: true },
+      { name: '❓ Помощь', value: 'Пошаговая инструкция', inline: true }
     )
     .setColor(0x8b0000)
     .setFooter({ text: 'DOMINION · Skill. Discipline. Domination.' });
 
   const row1 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('nav:play').setLabel('🚀 Играть').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('nav:profile').setLabel('👤 Профиль').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('nav:tournaments').setLabel('🏆 Турниры').setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Кастом').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId('nav:matches').setLabel('🎮 Мои матчи').setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId('nav:ai').setLabel('🤖 AI (скоро)').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Кастом').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('nav:matches').setLabel('🎮 Мои матчи').setStyle(ButtonStyle.Secondary)
   );
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('nav:help').setLabel('❓ Как это работает').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('nav:help').setLabel('❓ Как играть').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('nav:admin').setLabel('⚙️ Управление').setStyle(ButtonStyle.Secondary)
   );
   return { embeds: [embed], components: [row1, row2] };
+}
+
+export function playMenuButtons() {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('nav:custom').setLabel('⚔️ Создать кастом').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('nav:tournaments').setLabel('🏆 Найти турнир').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('nav:matches').setLabel('🎮 Мои матчи').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('nav:profile').setLabel('👤 Профиль').setStyle(ButtonStyle.Secondary)
+  )];
 }
 
 
@@ -166,11 +175,11 @@ export function profileEmbed(player, discordUser) {
 export function profileButtons() {
   return [
     new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('nav:play').setLabel('🚀 Играть').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('nav:profile').setLabel('👤 Профиль').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId('nav:stats').setLabel('📊 Статистика').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('nav:matches').setLabel('⚔️ Матчи').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('nav:achievements').setLabel('🏆 Достижения').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId('nav:history').setLabel('🕘 История').setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId('nav:achievements').setLabel('🏆 Достижения').setStyle(ButtonStyle.Secondary)
     ),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('profile:edit').setLabel('✏️ Изменить профиль').setStyle(ButtonStyle.Primary)
@@ -280,8 +289,8 @@ export function profileModal(player = null) {
     .setCustomId('profile:save')
     .setTitle('Профиль DOMINION')
     .addComponents(
-      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('nick').setLabel('Ник в Standoff 2').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(32).setValue(player?.standoff_nick || '')),
-      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('standoff_id').setLabel('ID игрока Standoff 2').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(64).setValue(player?.standoff_id || ''))
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('nick').setLabel('Ник в Standoff 2').setPlaceholder('Например: Lfg').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(32).setValue(player?.standoff_nick || '')),
+      new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('standoff_id').setLabel('ID игрока Standoff 2').setPlaceholder('Введи свой ID из Standoff 2').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(64).setValue(player?.standoff_id || ''))
     );
 }
 
