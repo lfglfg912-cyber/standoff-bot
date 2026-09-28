@@ -141,7 +141,20 @@ export async function getPlayer(discordId) {
 }
 
 export async function listPlayers() {
-  const { rows } = await query('SELECT discord_id, standoff_nick, standoff_id FROM players ORDER BY standoff_nick ASC LIMIT 25');
+  const { rows } = await query('SELECT discord_id, standoff_nick, standoff_id FROM players ORDER BY standoff_nick ASC');
+  return rows;
+}
+
+
+export async function getRatingHistory(discordId, limit = 10) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 10, 25));
+  const { rows } = await query(`
+    SELECT id, match_type, match_id, old_rating, new_rating, delta, created_at
+    FROM rating_history
+    WHERE discord_id = $1
+    ORDER BY created_at DESC, id DESC
+    LIMIT $2
+  `, [discordId, safeLimit]);
   return rows;
 }
 
