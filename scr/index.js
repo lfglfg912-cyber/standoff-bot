@@ -6,7 +6,7 @@ import {
 import { initDb, getPlayer, upsertPlayer, listPlayers, listTournaments, addModerationWarning, getModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
 import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
-import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
+import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
 import { analyzeCustomResultScreenshotOCR } from './ocr.js';
 
@@ -167,8 +167,7 @@ client.on(Events.InteractionCreate, async interaction => {
         if (action === 'achievements') return interaction.reply({ embeds: [profileSimpleSection('🏆 Достижения', 'Система достижений подключается следующим модулем. Здесь будут MVP, серии побед и награды турниров.')], components: profileButtons(), ephemeral: true });
         if (action === 'history') return interaction.reply({ embeds: [profileSimpleSection('🕘 История', 'Здесь будет история матчей, изменения рейтинга и полученные звания.')], components: profileButtons(), ephemeral: true });
         if (action === 'ai') {
-          if (!aiEnabled()) return interaction.reply({ content: '🤖 AI пока не подключён. Администратору нужно добавить OPENAI_API_KEY.', ephemeral: true });
-          return interaction.showModal(aiModal());
+          return interaction.reply({ content: '🤖 **ИИ временно недоступен.**\nФункция находится в разработке. Остальные функции DOMINION работают штатно.', ephemeral: true });
         }
         if (action === 'help') return interaction.reply({ embeds: [new EmbedBuilder().setTitle('❓ DOMINION').setDescription('1. Создай профиль.\n2. Открой турниры.\n3. Нажми «Участвовать».\n4. После заполнения сетки администратор запускает турнир.\n5. После матча победитель подтверждается кнопкой.\n6. Следующий раунд создаётся автоматически.').setColor(0x8b0000)], ephemeral: true });
         if (action === 'admin') {
@@ -257,8 +256,8 @@ client.on(Events.InteractionCreate, async interaction => {
         }
       }
       if (scope === 't') {
-        if (action === 'view') return interaction.reply({ ...(await tournamentView(id)), ephemeral: true });
-        if (action === 'refresh') return interaction.update(await tournamentView(id));
+        if (action === 'view') return interaction.reply({ ...(await tournamentView(id, isAdmin(interaction))), ephemeral: true });
+        if (action === 'refresh') return interaction.update(await tournamentView(id, isAdmin(interaction)));
         if (action === 'join') {
           if (!await getPlayer(interaction.user.id)) return interaction.reply({ content: 'Сначала создай профиль через 👤 Профиль.', ephemeral: true });
           await joinTournament(id, interaction.user.id);
@@ -291,7 +290,7 @@ client.on(Events.InteractionCreate, async interaction => {
       if (scope === 'veto' && action === 'vote') {
         const mapName = decodeURIComponent(extra || '');
         await castMapVote(id, interaction.user.id, mapName);
-        return interaction.update(await tournamentView((await getTournamentV2(id)).id));
+        return interaction.update(await tournamentView((await getTournamentV2(id)).id, isAdmin(interaction)));
       }
 
       if (scope === 'match' && action === 'win') {
@@ -349,10 +348,7 @@ client.on(Events.InteractionCreate, async interaction => {
         return interaction.reply({ ...(await profileCard(player, interaction.user)), ephemeral: true });
       }
       if (interaction.customId === 'ai:ask') {
-        await interaction.deferReply({ ephemeral: true });
-        const prompt = interaction.fields.getTextInputValue('prompt').trim();
-        const answer = await askAI(interaction.user.id, prompt);
-        return interaction.editReply({ embeds: [new EmbedBuilder().setTitle('🤖 DOMINION AI').setDescription(answer).setColor(0x8b0000)] });
+        return interaction.reply({ content: '🤖 **ИИ временно недоступен.**\nФункция находится в разработке. Остальные функции DOMINION работают штатно.', ephemeral: true });
       }
       if (interaction.customId.startsWith('team:register:')) {
         const tournamentId = interaction.customId.split(':')[2];
