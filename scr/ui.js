@@ -327,7 +327,8 @@ export function tournamentCreateModal() {
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('name').setLabel('Название').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(60)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('format').setLabel('Формат: 1v1 / 2v2 / 3v3 / 4v4 / 5v5').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(3)),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('slots').setLabel('Команд/участников: 4 / 8 / 16 / 32').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2)),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('prize').setLabel('Призовой фонд в Gold').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(8))
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('prize').setLabel('Призовой фонд в Gold').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(8)),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('rounds').setLabel('Раундов в матче (минимум 10)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2))
   );
 }
 
