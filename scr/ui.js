@@ -205,29 +205,24 @@ export function customFormatButtons() {
 
 export function customPlayerSelection(format, players, creatorId) {
   const size = Number(format.split('v')[0]);
-  const available = players.filter(p => p.discord_id !== creatorId);
-  const options = available.map(p => ({
-    label: `${String(p.standoff_nick || 'Игрок')} — ID: ${String(p.standoff_id || 'не указан')}`.slice(0, 100),
-    value: p.discord_id,
-    description: `Standoff ID: ${String(p.standoff_id || 'не указан')}`.slice(0, 100)
-  }));
   const rows = [];
+
   if (size > 1) {
     rows.push(new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
+      new UserSelectMenuBuilder()
         .setCustomId('custom:team1')
         .setPlaceholder(`Команда 1: выбери ещё ${size - 1} игрок(а)`)
         .setMinValues(size - 1).setMaxValues(size - 1)
-        .addOptions(options)
     ));
   }
+
   rows.push(new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
+    new UserSelectMenuBuilder()
       .setCustomId('custom:team2')
       .setPlaceholder(`Команда 2: выбери ${size} игрок(а)`)
       .setMinValues(size).setMaxValues(size)
-      .addOptions(options)
   ));
+
   return rows;
 }
 
