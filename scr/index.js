@@ -134,9 +134,51 @@ client.on(Events.InteractionCreate, async interaction => {
         const member = await interaction.guild.members.fetch(targetId).catch(() => null);
         if (!member) return interaction.reply({ content: '❌ Участник не найден на сервере.', ephemeral: true });
         return interaction.update({
-          content: `🛡️ **Модерация участника**\n\nУчастник: <@${targetId}>\nВыбери действие:`,
+          content: `🛡️ **Модерация участника**\\n\\nУчастник: <@${targetId}>\\nВыбери действие:`,
           components: moderationActions(targetId)
         });
+      }
+
+      if (interaction.customId === 'custom:team1' || interaction.customId === 'custom:team2') {
+        const draft = customDrafts.get(interaction.user.id);
+        if (!draft) return interaction.reply({ content: 'Сессия создания кастома устарела. Нажми «Создать кастом» ещё раз.', ephemeral: true });
+
+        const selected = interaction.values.map(String);
+        const registered = new Set((await listPlayers()).map(p => String(p.discord_id)));
+        if (selected.some(id => !registered.has(id))) {
+          return interaction.reply({ content: '❌ Все выбранные игроки должны сначала создать профиль DOMINION.', ephemeral: true });
+        }
+        if (selected.includes(interaction.user.id)) {
+          return interaction.reply({ content: '❌ Нельзя выбрать себя ещё раз — ты уже в Команде 1.', ephemeral: true });
+        }
+
+        const size = Number(draft.format.split('v')[0]);
+        if (interaction.customId === 'custom:team1') {
+          draft.team1 = [interaction.user.id, ...selected];
+          return interaction.update({
+            content: `⚔️ **${draft.format} — выбор игроков**\\n\\nКоманда 1: ${draft.team1.map(x => `<@${x}>`).join(', ')}\\n\\nТеперь выбери **Команду 2**.`,
+            components: [new (await import('discord.js')).ActionRowBuilder().addComponents(
+              new (await import('discord.js')).UserSelectMenuBuilder()
+                .setCustomId('custom:team2')
+                .setPlaceholder(`Команда 2: выбери ${size} игрок(а)`)
+                .setMinValues(size).setMaxValues(size)
+            )]
+          });
+        }
+
+        if (selected.some(id => draft.team1.includes(id))) {
+          return interaction.reply({ content: '❌ Один игрок не может быть сразу в двух командах.', ephemeral: true });
+        }
+
+        draft.team2 = selected;
+        const game = await createCustomGame({
+          format: draft.format,
+          team1Ids: draft.team1,
+          team2Ids: draft.team2,
+          createdBy: interaction.user.id
+        });
+        customDrafts.delete(interaction.user.id);
+        return interaction.update(await customGameView(game.match.id));
       }
     }
 
