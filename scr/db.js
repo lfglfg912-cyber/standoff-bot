@@ -135,6 +135,14 @@ export async function getModerationWarnings(guildId, userId) {
   return rows;
 }
 
+export async function clearModerationWarnings(guildId, userId) {
+  const result = await query(
+    'DELETE FROM moderation_warnings WHERE guild_id = $1 AND user_id = $2',
+    [guildId, userId]
+  );
+  return result.rowCount;
+}
+
 export async function getPlayer(discordId) {
   const { rows } = await query('SELECT * FROM players WHERE discord_id = $1', [discordId]);
   return rows[0] ?? null;
