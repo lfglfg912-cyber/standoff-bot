@@ -3,6 +3,8 @@ import { query } from './db.js';
 export async function initTournamentV2Db() {
   await query(`
     ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS format TEXT NOT NULL DEFAULT '1v1';
+    ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS cancelled_by TEXT;
+    ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS team1_id BIGINT;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS team2_id BIGINT;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS winner_team_id BIGINT;
@@ -228,7 +230,7 @@ export async function registerTournamentTeam(tournamentId, captainId, teamName, 
   }
 }
 
-export async function cancelTournamentV2(tournamentId) {
+export async function cancelTournamentV2(tournamentId, cancelledBy = null, reason = null) {
   const client = await (await import('./db.js')).pool.connect();
   try {
     await client.query('BEGIN');
@@ -237,8 +239,8 @@ export async function cancelTournamentV2(tournamentId) {
     if (!t) throw new Error('TOURNAMENT_NOT_FOUND');
     if (!['registration', 'running'].includes(t.status)) throw new Error('TOURNAMENT_NOT_ACTIVE');
     await client.query(
-      "UPDATE tournaments SET status = 'cancelled', finished_at = NOW() WHERE id = $1",
-      [tournamentId]
+      "UPDATE tournaments SET status = 'cancelled', finished_at = NOW(), cancelled_by = $2, cancel_reason = $3 WHERE id = $1",
+      [tournamentId, cancelledBy, reason]
     );
     await client.query('COMMIT');
     return true;
