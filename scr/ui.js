@@ -174,9 +174,9 @@ export function customPlayerSelection(format, players, creatorId) {
   const size = Number(format.split('v')[0]);
   const available = players.filter(p => p.discord_id !== creatorId);
   const options = available.map(p => ({
-    label: String(p.standoff_nick || 'Игрок').slice(0, 100),
+    label: `${String(p.standoff_nick || 'Игрок')} — ID: ${String(p.standoff_id || 'не указан')}`.slice(0, 100),
     value: p.discord_id,
-    description: ('ID: ' + p.discord_id).slice(0, 100)
+    description: `Standoff ID: ${String(p.standoff_id || 'не указан')}`.slice(0, 100)
   }));
   const rows = [];
   if (size > 1) {
