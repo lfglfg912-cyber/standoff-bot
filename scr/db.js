@@ -19,12 +19,13 @@ export async function query(text, params = []) {
 }
 
 export async function initDb() {
+  await query(`UPDATE players SET rating = 0 WHERE (COALESCE(wins, 0) + COALESCE(losses, 0)) < 5 AND rating = 1000;`);
   await query(`
     CREATE TABLE IF NOT EXISTS players (
       discord_id TEXT PRIMARY KEY,
       standoff_nick TEXT NOT NULL,
       standoff_id TEXT,
-      rating INTEGER NOT NULL DEFAULT 1000,
+      rating INTEGER NOT NULL DEFAULT 0,
       wins INTEGER NOT NULL DEFAULT 0,
       losses INTEGER NOT NULL DEFAULT 0,
       tournaments INTEGER NOT NULL DEFAULT 0,
