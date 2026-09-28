@@ -228,6 +228,28 @@ export async function registerTournamentTeam(tournamentId, captainId, teamName, 
   }
 }
 
+export async function cancelTournamentV2(tournamentId) {
+  const client = await (await import('./db.js')).pool.connect();
+  try {
+    await client.query('BEGIN');
+    const r = await client.query('SELECT * FROM tournaments WHERE id = $1 FOR UPDATE', [tournamentId]);
+    const t = r.rows[0];
+    if (!t) throw new Error('TOURNAMENT_NOT_FOUND');
+    if (!['registration', 'running'].includes(t.status)) throw new Error('TOURNAMENT_NOT_ACTIVE');
+    await client.query(
+      "UPDATE tournaments SET status = 'cancelled', finished_at = NOW() WHERE id = $1",
+      [tournamentId]
+    );
+    await client.query('COMMIT');
+    return true;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function startTournamentV2(tournamentId) {
   const client = await (await import('./db.js')).pool.connect();
   try {
