@@ -3,8 +3,8 @@ import {
   Client, GatewayIntentBits, Events, PermissionsBitField, EmbedBuilder,
   REST, Routes
 } from 'discord.js';
-import { initDb, getPlayer, upsertPlayer, listPlayers, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, clearModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, tournamentTeamNameModal, tournamentTeamSelection, resultButtons, resultScoreModal, profileStatsEmbed, profileSimpleSection, playMenuButtons, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm, roundVoteButtons } from './ui.js';
+import { initDb, getPlayer, upsertPlayer, listPlayers, getLeaderboard, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, clearModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, tournamentTeamNameModal, tournamentTeamSelection, resultButtons, resultScoreModal, profileStatsEmbed, profileSimpleSection, leaderboardEmbed, playMenuButtons, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm, roundVoteButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getRoundVoteState, castRoundVote, getCustomRoundVoteState, castCustomRoundVote, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 
@@ -156,6 +156,20 @@ client.on(Events.InteractionCreate, async interaction => {
         const invite = await channel.createInvite({ maxAge: 0, maxUses: 0, unique: true, reason: 'DOMINION recruitment' });
         return interaction.reply({
           content: `📢 **Приглашение в DOMINION**\\n\\n⚔️ Standoff 2 · турниры · кастомные матчи · рейтинг\\n\\n${invite.url}\\n\\nОтправь эту ссылку друзьям или игрокам, которых хочешь позвать на сервер.`,
+          ephemeral: true
+        });
+      }
+
+      if (interaction.commandName === 'invite') {
+        if (!interaction.inGuild()) return interaction.reply({ content: '❌ Команду нужно использовать на сервере DOMINION.', ephemeral: true });
+        const channel = interaction.channel;
+        const permissions = channel?.permissionsFor(client.user);
+        if (!channel?.isTextBased() || !permissions?.has(PermissionsBitField.Flags.CreateInstantInvite)) {
+          return interaction.reply({ content: '❌ Боту нужно право **Создавать приглашения** в этом канале.', ephemeral: true });
+        }
+        const invite = await channel.createInvite({ maxAge: 0, maxUses: 0, unique: true, reason: 'DOMINION recruitment' });
+        return interaction.reply({
+          content: `📢 **Приглашение в DOMINION**\\n\\n⚔️ Standoff 2 · турниры · кастомные матчи · рейтинг\\n\\n${invite.url}\\n\\nОтправь ссылку друзьям или игрокам, которых хочешь позвать на сервер.`,
           ephemeral: true
         });
       }
@@ -361,7 +375,6 @@ client.on(Events.InteractionCreate, async interaction => {
           return interaction.reply({ content: '🤖 **ИИ временно недоступен.**\nФункция находится в разработке. Остальные функции DOMINION работают штатно.', ephemeral: true });
         }
         if (action === 'invite') {
-          if (!isModerator(interaction)) return interaction.reply({ content: '❌ Создавать приглашения может только администрация или модераторы.', ephemeral: true });
           const channel = interaction.channel;
           const permissions = channel?.permissionsFor(client.user);
           if (!channel?.isTextBased() || !permissions?.has(PermissionsBitField.Flags.CreateInstantInvite)) {
@@ -372,6 +385,10 @@ client.on(Events.InteractionCreate, async interaction => {
             content: `📢 **Приглашение в DOMINION**\\n\\n⚔️ Standoff 2 · турниры · кастомные матчи · рейтинг\\n\\n${invite.url}\\n\\nОтправь ссылку друзьям или игрокам, которых хочешь позвать на сервер.`,
             ephemeral: true
           });
+        }
+        if (action === 'leaderboard') {
+          const players = await getLeaderboard(10);
+          return interaction.reply({ embeds: [leaderboardEmbed(players)], ephemeral: true });
         }
         if (action === 'help') return interaction.reply({
           embeds: [new EmbedBuilder()
