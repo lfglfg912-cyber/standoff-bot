@@ -3,7 +3,7 @@ import {
   Client, GatewayIntentBits, Events, PermissionsBitField, EmbedBuilder,
   REST, Routes
 } from 'discord.js';
-import { initDb, getPlayer, upsertPlayer, listPlayers, listTournaments, addModerationWarning, getModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
+import { initDb, getPlayer, upsertPlayer, listPlayers, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
 import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, tournamentCancelConfirm } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
@@ -224,7 +224,20 @@ client.on(Events.InteractionCreate, async interaction => {
             components: profileButtons(), ephemeral: true
           });
         }
-        if (action === 'history') return interaction.reply({ ...(await matchesEmbed(interaction.user.id)), components: profileButtons(), ephemeral: true });
+        if (action === 'history') {
+          const history = await getRatingHistory(interaction.user.id, 10);
+          const matches = await matchesEmbed(interaction.user.id);
+          const ratingText = history.length
+            ? history.map(h => {
+                const delta = Number(h.delta);
+                const sign = delta > 0 ? '+' : '';
+                return `${delta > 0 ? '📈' : delta < 0 ? '📉' : '➖'} **${h.old_rating} → ${h.new_rating}** (${sign}${delta})`;
+              }).join('\\n')
+            : 'Изменений рейтинга пока нет. Во время первых 4 матчей калибровки рейтинг остаётся 0.';
+          const embed = matches.embeds?.[0] || new EmbedBuilder().setTitle('🕘 История');
+          embed.setTitle('🕘 История игрока').addFields({ name: '📊 Последние изменения рейтинга', value: ratingText });
+          return interaction.reply({ embeds: [embed], components: profileButtons(), ephemeral: true });
+        }
         if (action === 'ai') {
           return interaction.reply({ content: '🤖 **ИИ временно недоступен.**\nФункция находится в разработке. Остальные функции DOMINION работают штатно.', ephemeral: true });
         }
