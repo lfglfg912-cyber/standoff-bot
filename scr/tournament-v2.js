@@ -239,6 +239,10 @@ export async function cancelTournamentV2(tournamentId, cancelledBy = null, reaso
     if (!t) throw new Error('TOURNAMENT_NOT_FOUND');
     if (!['registration', 'running'].includes(t.status)) throw new Error('TOURNAMENT_NOT_ACTIVE');
     await client.query(
+      "UPDATE matches SET status = 'cancelled', completed_at = NOW() WHERE tournament_id = $1 AND status <> 'completed'",
+      [tournamentId]
+    );
+    await client.query(
       "UPDATE tournaments SET status = 'cancelled', finished_at = NOW(), cancelled_by = $2, cancel_reason = $3 WHERE id = $1",
       [tournamentId, cancelledBy, reason]
     );
@@ -401,59 +405,127 @@ export async function castMapVote(matchId, discordId, mapName) {
   finally { client.release(); }
 }
 
+async function applyCompetitiveResult(client, winnerIds, loserIds) {
+  const ids = [...new Set([...winnerIds, ...loserIds].filter(Boolean).map(String))];
+  if (!ids.length) return;
+
+  const result = await client.query(
+    'SELECT discord_id, wins, losses, rating FROM players WHERE discord_id = ANY($1::text[]) FOR UPDATE',
+    [ids]
+  );
+  const before = new Map(result.rows.map(row => [String(row.discord_id), row]));
+
+  for (const id of winnerIds) {
+    const row = before.get(String(id));
+    if (!row) continue;
+    const oldTotal = Number(row.wins || 0) + Number(row.losses || 0);
+    const wins = Number(row.wins || 0) + 1;
+    const losses = Number(row.losses || 0);
+    const total = wins + losses;
+    const rating = total < 5
+      ? 0
+      : oldTotal < 5
+        ? Math.max(0, Math.min(1300, 1000 + wins * 50 - losses * 30))
+        : Number(row.rating || 0) + 15;
+    await client.query('UPDATE players SET wins=$1, rating=$2, updated_at=NOW() WHERE discord_id=$3', [wins, rating, id]);
+  }
+
+  for (const id of loserIds) {
+    const row = before.get(String(id));
+    if (!row) continue;
+    const oldTotal = Number(row.wins || 0) + Number(row.losses || 0);
+    const wins = Number(row.wins || 0);
+    const losses = Number(row.losses || 0) + 1;
+    const total = wins + losses;
+    const rating = total < 5
+      ? 0
+      : oldTotal < 5
+        ? Math.max(0, Math.min(1300, 1000 + wins * 50 - losses * 30))
+        : Math.max(0, Number(row.rating || 0) - 10);
+    await client.query('UPDATE players SET losses=$1, rating=$2, updated_at=NOW() WHERE discord_id=$3', [losses, rating, id]);
+  }
+}
+
 export async function reportMatchV2(matchId, reporterId, winnerId, winnerTeamId = null) {
   const client = await (await import('./db.js')).pool.connect();
   try {
     await client.query('BEGIN');
-    const r = await client.query('SELECT * FROM matches WHERE id = $1 FOR UPDATE', [matchId]);
+    const r = await client.query(`
+      SELECT m.*, t.status AS tournament_status
+      FROM matches m
+      JOIN tournaments t ON t.id = m.tournament_id
+      WHERE m.id = $1
+      FOR UPDATE
+    `, [matchId]);
     const m = r.rows[0];
     if (!m) throw new Error('MATCH_NOT_FOUND');
+    if (m.tournament_status !== 'running') throw new Error('TOURNAMENT_NOT_ACTIVE');
     if (m.status !== 'pending' && m.status !== 'active') throw new Error('MATCH_ALREADY_DONE');
     if (m.veto_status !== 'finished') throw new Error('VETO_NOT_FINISHED');
 
     let valid = false;
     if (m.team1_id && m.team2_id) {
       const rr = await client.query('SELECT id, captain_id FROM tournament_teams WHERE id = ANY($1::bigint[])', [[m.team1_id, m.team2_id]]);
-      valid = rr.rows.some(x => String(x.captain_id) === String(reporterId)) && [String(m.team1_id), String(m.team2_id)].includes(String(winnerTeamId));
+      valid = rr.rows.some(x => String(x.captain_id) === String(reporterId)) &&
+        [String(m.team1_id), String(m.team2_id)].includes(String(winnerTeamId));
     } else {
-      valid = [m.player1_id, m.player2_id].includes(reporterId) && [m.player1_id, m.player2_id].includes(winnerId);
+      valid = [m.player1_id, m.player2_id].includes(reporterId) &&
+        [m.player1_id, m.player2_id].includes(winnerId);
     }
     if (!valid) throw new Error('NOT_A_PLAYER');
 
-    const loserId = m.team1_id ? null : (winnerId === m.player1_id ? m.player2_id : m.player1_id);
-    await client.query(`
-      UPDATE matches SET winner_id=$1, winner_team_id=$2, status='completed', completed_at=NOW()
-      WHERE id=$3
-    `, [winnerId, winnerTeamId, matchId]);
-
-    if (loserId) {
-      await client.query('UPDATE players SET wins=wins+1, rating=rating+15, updated_at=NOW() WHERE discord_id=$1', [winnerId]);
-      await client.query('UPDATE players SET losses=losses+1, rating=GREATEST(0,rating-10), updated_at=NOW() WHERE discord_id=$1', [loserId]);
+    let winnerIds;
+    let loserIds;
+    if (m.team1_id && m.team2_id) {
+      const winningTeam = String(winnerTeamId) === String(m.team1_id) ? m.team1_id : m.team2_id;
+      const losingTeam = winningTeam === m.team1_id ? m.team2_id : m.team1_id;
+      winnerIds = (await client.query('SELECT discord_id FROM tournament_team_members WHERE team_id=$1', [winningTeam])).rows.map(x => x.discord_id);
+      loserIds = (await client.query('SELECT discord_id FROM tournament_team_members WHERE team_id=$1', [losingTeam])).rows.map(x => x.discord_id);
+    } else {
+      winnerIds = [winnerId];
+      loserIds = [winnerId === m.player1_id ? m.player2_id : m.player1_id];
     }
 
-    const pending = await client.query('SELECT 1 FROM matches WHERE tournament_id=$1 AND round=$2 AND status<>\'completed\'', [m.tournament_id,m.round]);
+    await client.query(
+      "UPDATE matches SET winner_id=$1, winner_team_id=$2, status='completed', completed_at=NOW() WHERE id=$3",
+      [winnerId, winnerTeamId, matchId]
+    );
+    await applyCompetitiveResult(client, winnerIds, loserIds);
+
+    const pending = await client.query(
+      "SELECT 1 FROM matches WHERE tournament_id=$1 AND round=$2 AND status NOT IN ('completed','cancelled')",
+      [m.tournament_id, m.round]
+    );
     if (!pending.rows.length) {
-      const roundMatches = await client.query('SELECT * FROM matches WHERE tournament_id=$1 AND round=$2 ORDER BY match_no',[m.tournament_id,m.round]);
-      const winners = roundMatches.rows.map(x => x.team1_id ? { teamId:x.winner_team_id } : { id:x.winner_id });
+      const roundMatches = await client.query(
+        'SELECT * FROM matches WHERE tournament_id=$1 AND round=$2 ORDER BY match_no',
+        [m.tournament_id, m.round]
+      );
+      const winners = roundMatches.rows
+        .filter(x => x.status === 'completed')
+        .map(x => x.team1_id ? { teamId: x.winner_team_id } : { id: x.winner_id });
+
       if (winners.length === 1) {
-        await client.query("UPDATE tournaments SET status='finished', finished_at=NOW() WHERE id=$1",[m.tournament_id]);
-      } else {
-        const nextRound=m.round+1;
-        for(let i=0;i<winners.length;i+=2){
-          const a=winners[i], b=winners[i+1];
+        await client.query("UPDATE tournaments SET status='finished', finished_at=NOW() WHERE id=$1", [m.tournament_id]);
+      } else if (winners.length > 1 && winners.length % 2 === 0) {
+        const nextRound = m.round + 1;
+        for (let i = 0; i < winners.length; i += 2) {
+          const a = winners[i], b = winners[i + 1];
           await client.query(`
             INSERT INTO matches (tournament_id,round,match_no,player1_id,player2_id,team1_id,team2_id,map_pool,veto_step,veto_status)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,0,'active')
-          `,[m.tournament_id,nextRound,i/2+1,a.id||null,b.id||null,a.teamId||null,b.teamId||null,MAP_POOL]);
+          `, [m.tournament_id, nextRound, i / 2 + 1, a.id || null, b.id || null, a.teamId || null, b.teamId || null, MAP_POOL]);
         }
       }
     }
     await client.query('COMMIT');
     return true;
-  } catch(error) {
+  } catch (error) {
     await client.query('ROLLBACK');
     throw error;
-  } finally { client.release(); }
+  } finally {
+    client.release();
+  }
 }
 
 export async function createCustomGame({ format, team1Ids, team2Ids, createdBy }) {
