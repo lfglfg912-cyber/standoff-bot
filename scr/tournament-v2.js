@@ -15,6 +15,8 @@ export async function initTournamentV2Db() {
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS selected_map TEXT;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS veto_round INTEGER NOT NULL DEFAULT 1;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS rounds_selected INTEGER;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS score1 INTEGER;
+    ALTER TABLE matches ADD COLUMN IF NOT EXISTS score2 INTEGER;
     CREATE TABLE IF NOT EXISTS match_round_votes (
       id BIGSERIAL PRIMARY KEY,
       match_id BIGINT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -70,6 +72,8 @@ export async function initTournamentV2Db() {
     );
 
     ALTER TABLE custom_matches ADD COLUMN IF NOT EXISTS rounds_selected INTEGER;
+    ALTER TABLE custom_matches ADD COLUMN IF NOT EXISTS score1 INTEGER;
+    ALTER TABLE custom_matches ADD COLUMN IF NOT EXISTS score2 INTEGER;
 
     CREATE TABLE IF NOT EXISTS custom_match_round_votes (
       id BIGSERIAL PRIMARY KEY,
@@ -558,13 +562,13 @@ async function applyCompetitiveResult(client, winnerIds, loserIds, matchType = '
     if (rating !== oldRating) {
       await client.query(
         "INSERT INTO rating_history (discord_id, match_type, match_id, old_rating, new_rating, delta) VALUES ($1,$2,$3,$4,$5,$6)",
-        [id, oldRating, rating, rating - oldRating]
+        [id, matchType, matchId, oldRating, rating, rating - oldRating]
       );
     }
   }
 }
 
-export async function reportMatchV2(matchId, reporterId, winnerId, winnerTeamId = null) {
+export async function reportMatchV2(matchId, reporterId, winnerId, winnerTeamId = null, score1 = null, score2 = null) {
   const client = await (await import('./db.js')).pool.connect();
   try {
     await client.query('BEGIN');
@@ -580,15 +584,20 @@ export async function reportMatchV2(matchId, reporterId, winnerId, winnerTeamId 
     if (m.tournament_status !== 'running') throw new Error('TOURNAMENT_NOT_ACTIVE');
     if (m.status !== 'pending' && m.status !== 'active') throw new Error('MATCH_ALREADY_DONE');
     if (m.veto_status !== 'finished') throw new Error('VETO_NOT_FINISHED');
+    if (m.rounds_selected == null) throw new Error('ROUNDS_NOT_SELECTED');
+    const s1 = Number(score1), s2 = Number(score2);
+    if (!Number.isInteger(s1) || !Number.isInteger(s2) || s1 < 0 || s2 < 0 || s1 === s2) throw new Error('INVALID_SCORE');
+    if (s1 + s2 > Number(m.rounds_selected)) throw new Error('SCORE_EXCEEDS_ROUNDS');
 
     let valid = false;
     if (m.team1_id && m.team2_id) {
       const rr = await client.query('SELECT id, captain_id FROM tournament_teams WHERE id = ANY($1::bigint[])', [[m.team1_id, m.team2_id]]);
-      valid = rr.rows.some(x => String(x.captain_id) === String(reporterId)) &&
-        [String(m.team1_id), String(m.team2_id)].includes(String(winnerTeamId));
+      valid = rr.rows.some(x => String(x.captain_id) === String(reporterId)) && [String(m.team1_id), String(m.team2_id)].includes(String(winnerTeamId));
+      if (valid) valid = String(winnerTeamId) === String(m.team1_id) ? s1 > s2 : s2 > s1;
     } else {
       valid = [m.player1_id, m.player2_id].includes(reporterId) &&
         [m.player1_id, m.player2_id].includes(winnerId);
+      if (valid) valid = String(winnerId) === String(m.player1_id) ? s1 > s2 : s2 > s1;
     }
     if (!valid) throw new Error('NOT_A_PLAYER');
 
@@ -605,7 +614,7 @@ export async function reportMatchV2(matchId, reporterId, winnerId, winnerTeamId 
     }
 
     await client.query(
-      "UPDATE matches SET winner_id=$1, winner_team_id=$2, status='completed', completed_at=NOW() WHERE id=$3",
+      "UPDATE matches SET winner_id=$1, winner_team_id=$2, score1=$3, score2=$4, status='completed', completed_at=NOW() WHERE id=$5",
       [winnerId, winnerTeamId, matchId]
     );
     await applyCompetitiveResult(client, winnerIds, loserIds, 'tournament', matchId);
@@ -757,7 +766,7 @@ export async function castCustomMapVote(matchId, discordId, mapName) {
   }
 }
 
-export async function reportCustomGame(matchId, reporterId, winnerTeam) {
+export async function reportCustomGame(matchId, reporterId, winnerTeam, score1 = null, score2 = null) {
   const pool = (await import('./db.js')).pool;
   const db = await pool.connect();
   try {
@@ -767,12 +776,17 @@ export async function reportCustomGame(matchId, reporterId, winnerTeam) {
     if (!match) throw new Error('CUSTOM_NOT_FOUND');
     if (match.status === 'completed') throw new Error('MATCH_ALREADY_DONE');
     if (match.veto_status !== 'finished') throw new Error('VETO_NOT_FINISHED');
+    if (match.rounds_selected == null) throw new Error('ROUNDS_NOT_SELECTED');
+    const s1 = Number(score1), s2 = Number(score2);
+    if (!Number.isInteger(s1) || !Number.isInteger(s2) || s1 < 0 || s2 < 0 || s1 === s2) throw new Error('INVALID_SCORE');
+    if (s1 + s2 > Number(match.rounds_selected)) throw new Error('SCORE_EXCEEDS_ROUNDS');
     const team1 = match.team1_ids || [], team2 = match.team2_ids || [];
     if (![...team1,...team2].includes(reporterId)) throw new Error('NOT_A_PLAYER');
     if (![1,2].includes(Number(winnerTeam))) throw new Error('INVALID_WINNER');
+    if (Number(winnerTeam) === 1 ? s1 <= s2 : s2 <= s1) throw new Error('INVALID_SCORE');
     const winners = Number(winnerTeam) === 1 ? team1 : team2;
     const losers = Number(winnerTeam) === 1 ? team2 : team1;
-    await db.query("UPDATE custom_matches SET status='completed',winner_team=$1,completed_at=NOW() WHERE id=$2",[winnerTeam,matchId]);
+    await db.query("UPDATE custom_matches SET status='completed',winner_team=$1,score1=$2,score2=$3,completed_at=NOW() WHERE id=$4",[winnerTeam,s1,s2,matchId]);
     await applyCompetitiveResult(db, winners, losers, 'custom', matchId);
     await db.query('COMMIT');
     return true;
