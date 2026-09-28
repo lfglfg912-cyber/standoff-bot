@@ -3,6 +3,7 @@ import { query } from './db.js';
 export async function initTournamentV2Db() {
   await query(`
     ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS format TEXT NOT NULL DEFAULT '1v1';
+    ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS rounds_per_match INTEGER NOT NULL DEFAULT 10;
     ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS cancelled_by TEXT;
     ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
     ALTER TABLE matches ADD COLUMN IF NOT EXISTS team1_id BIGINT;
@@ -114,14 +115,15 @@ function normalizeFormat(format) {
   return '1v1';
 }
 
-export async function createTournamentV2({ name, slots, prizeGold, createdBy, format }) {
+export async function createTournamentV2({ name, slots, prizeGold, createdBy, format, roundsPerMatch }) {
   const normalized = normalizeFormat(format);
   if (![4, 8, 16, 32].includes(slots)) throw new Error('INVALID_SLOTS');
+  if (!Number.isInteger(roundsPerMatch) || roundsPerMatch < 10 || roundsPerMatch > 99) throw new Error('INVALID_ROUNDS');
   const { rows } = await query(`
-    INSERT INTO tournaments (name, slots, prize_gold, format, created_by)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO tournaments (name, slots, prize_gold, format, rounds_per_match, created_by)
+    VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING *
-  `, [name, slots, prizeGold, normalized, createdBy]);
+  `, [name, slots, prizeGold, normalized, roundsPerMatch, createdBy]);
   return rows[0];
 }
 
