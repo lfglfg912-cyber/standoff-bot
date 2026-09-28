@@ -1,5 +1,5 @@
 import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
-import { getTournamentV2, getTournamentTeams, getTournamentMatchesV2, getPlayerOrCaptainMatches, getVetoState, TEAM_FORMATS } from './tournament-v2.js';
+import { getTournamentV2, getTournamentTeams, getTournamentTeamMembersWithStats, getTournamentMatchesV2, getPlayerOrCaptainMatches, getVetoState, TEAM_FORMATS } from './tournament-v2.js';
 import { resultButtons, vetoButtons } from './ui.js';
 
 export function tournamentsEmbed(tournaments) {
@@ -17,7 +17,20 @@ export async function tournamentView(id, canManage = false) {
   const format=t.format||'1v1', teams=format==='1v1'?[]:await getTournamentTeams(id), matches=t.status==='registration'?[]:await getTournamentMatchesV2(id);
   const statusLabel = t.status === 'registration' ? 'Регистрация' : t.status === 'running' ? 'В процессе' : t.status === 'cancelled' ? 'Отменён' : 'Завершён';
   const embed=new EmbedBuilder().setTitle(`🏆 ${t.name}`).setDescription(`Формат: **${format}**\\nУчастники: **${t.registered}/${t.slots}**\\nПриз: **${t.prize_gold} G**\\nСтатус: **${statusLabel}**`).setColor(0x8b0000);
-  if(teams.length) embed.addFields({name:'👥 Команды',value:teams.slice(0,20).map((x,i)=>`${i+1}. **${x.name}** — капитан <@${x.captain_id}> — ${x.member_count}/${TEAM_FORMATS[format]}`).join('\n')});
+  if(teams.length) {
+    const members = await getTournamentTeamMembersWithStats(id);
+    const teamLines = teams.slice(0,20).map((team,i) => {
+      const roster = members.filter(m => String(m.team_id) === String(team.id));
+      const players = roster.map(m => {
+        const captain = String(m.discord_id) === String(team.captain_id) ? ' 👑' : '';
+        const total = Number(m.wins || 0) + Number(m.losses || 0);
+        const rank = total < 5 ? '🎯' : Number(m.rating || 0) >= 1500 ? '🏆' : Number(m.rating || 0) >= 1300 ? '⚔️' : Number(m.rating || 0) >= 1150 ? '🧠' : Number(m.rating || 0) >= 1000 ? '🔫' : '🔰';
+        return `${rank} <@${m.discord_id}>${captain}`;
+      }).join(', ');
+      return `${i + 1}. **${team.name}** — ${team.member_count}/${TEAM_FORMATS[format]}\\n   ${players || 'участники не указаны'}`;
+    }).join('\\n');
+    embed.addFields({name:'👥 Команды',value:teamLines});
+  }
   const components=[];
   if(matches.length){
     const active=matches.filter(m=>m.status!=='completed' && m.status!=='cancelled');
