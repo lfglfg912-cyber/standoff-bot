@@ -233,6 +233,15 @@ export function customGameModal() {
     )
   );
 }
+export function roundVoteButtons(matchId, prefix = 'round') {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`${prefix}:vote:${matchId}:10`).setLabel('10 раундов').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`${prefix}:vote:${matchId}:12`).setLabel('12 раундов').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`${prefix}:vote:${matchId}:14`).setLabel('14 раундов').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`${prefix}:vote:${matchId}:16`).setLabel('16 раундов').setStyle(ButtonStyle.Secondary)
+  )];
+}
+
 export function customGameButtons(game) {
   const rows = [];
   if (game?.veto_status === 'active') rows.push(...vetoButtons(game, game.bans || [], game.votes || [], 'custom'));
