@@ -295,7 +295,8 @@ export function moderationUserSelect() {
 export function moderationActions(userId) {
   return [
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(`mod:warn:${userId}`).setLabel('⚠️ Предупредить').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`mod:warnings:${userId}`).setLabel('📋 Предупреждения').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(`mod:warn:${userId}`).setLabel('⚠️ Выдать').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`mod:timeout:${userId}`).setLabel('🔇 Тайм-аут 10м').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`mod:kick:${userId}`).setLabel('👢 Кик').setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId(`mod:ban:${userId}`).setLabel('🔨 Бан').setStyle(ButtonStyle.Danger)
@@ -373,5 +374,12 @@ export function resultButtons(match, scope = 'match') {
     new ButtonBuilder().setCustomId(isTeam
       ? `${scope}:win:${match.id}:team:${match.team2_id}`
       : `match:win:${match.id}:player:${match.player2_id}`).setLabel(isTeam ? '🏆 Победила команда 2' : '🏆 Победил игрок 2').setStyle(ButtonStyle.Success)
+  )];
+}
+
+export function warningListButtons(userId, hasWarnings = true) {
+  return [new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`mod:back:${userId}`).setLabel('↩️ Назад').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`mod:clear:${userId}`).setLabel('🧹 Сбросить предупреждения').setStyle(ButtonStyle.Danger).setDisabled(!hasWarnings)
   )];
 }
