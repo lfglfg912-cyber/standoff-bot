@@ -3,8 +3,8 @@ import {
   Client, GatewayIntentBits, Events, PermissionsBitField, EmbedBuilder,
   REST, Routes
 } from 'discord.js';
-import { initDb, getPlayer, upsertPlayer, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customGameModal, customGameButtons } from './ui.js';
+import { initDb, getPlayer, upsertPlayer, listPlayers, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
@@ -23,6 +23,8 @@ function isAdmin(interaction) {
 async function ensurePlayer(interaction) {
   return getPlayer(interaction.user.id);
 }
+
+const customDrafts = new Map();
 
 async function showProfile(interaction) {
   const player = await ensurePlayer(interaction);
@@ -150,8 +152,64 @@ client.on(Events.InteractionCreate, async interaction => {
         }
       }
 
-      if (scope === 'custom' && action === 'new') return interaction.showModal(customGameModal());
+      if (scope === 'custom' && action === 'new') {
+        return interaction.reply({
+          content: '⚔️ **Создание кастома**\n\nВыбери формат:',
+          components: customFormatButtons(),
+          ephemeral: true
+        });
+      }
+      if (scope === 'custom' && action === 'format') {
+        const player = await ensurePlayer(interaction);
+        if (!player) return interaction.reply({ content: 'Сначала создай профиль DOMINION.', ephemeral: true });
+        const format = id;
+        const size = Number(format.split('v')[0]);
+        const players = await listPlayers();
+        const available = players.filter(p => p.discord_id !== interaction.user.id);
+        if (available.length < size * 2 - 1) return interaction.reply({ content: `❌ Недостаточно зарегистрированных игроков. Для ${format} нужно ${size * 2} игроков.`, ephemeral: true });
+        customDrafts.set(interaction.user.id, { format, team1: [interaction.user.id], team2: [] });
+        return interaction.update({
+          content: `⚔️ **${format} — выбор игроков**\n\nТы автоматически в **Команде 1**. Выбери остальных игроков.`,
+          components: customPlayerSelection(format, players, interaction.user.id)
+        });
+      }
       if (scope === 'custom' && action === 'view') return interaction.reply({ ...(await customGameView(id)), ephemeral: true });
+      if (scope === 'custom' && action === 'team1') {
+        const draft = customDrafts.get(interaction.user.id);
+        if (!draft) return interaction.reply({ content: 'Сессия создания кастома устарела. Нажми «Создать кастом» ещё раз.', ephemeral: true });
+        draft.team1 = [interaction.user.id, ...interaction.values];
+        const players = await listPlayers();
+        const filtered = players.filter(p => p.discord_id !== interaction.user.id && !draft.team1.includes(p.discord_id));
+        const size = Number(draft.format.split('v')[0]);
+        const options = filtered.map(p => ({
+          label: String(p.standoff_nick || 'Игрок').slice(0, 100),
+          value: p.discord_id,
+          description: ('ID: ' + p.discord_id).slice(0, 100)
+        }));
+        const rows = [new (await import('discord.js')).ActionRowBuilder().addComponents(
+          new (await import('discord.js')).StringSelectMenuBuilder()
+            .setCustomId('custom:team2').setPlaceholder(`Команда 2: выбери ${size} игрок(а)`)
+            .setMinValues(size).setMaxValues(size).addOptions(options)
+        )];
+        return interaction.update({
+          content: `⚔️ **${draft.format} — выбор игроков**\n\nКоманда 1: ${draft.team1.map(x => `<@${x}>`).join(', ')}\n\nТеперь выбери **Команду 2**.`,
+          components: rows
+        });
+      }
+      if (scope === 'custom' && action === 'team2') {
+        const draft = customDrafts.get(interaction.user.id);
+        if (!draft) return interaction.reply({ content: 'Сессия создания кастома устарела. Нажми «Создать кастом» ещё раз.', ephemeral: true });
+        draft.team2 = interaction.values;
+        try {
+          const game = await createCustomGame({ format: draft.format, team1Ids: draft.team1, team2Ids: draft.team2, createdBy: interaction.user.id });
+          customDrafts.delete(interaction.user.id);
+          return interaction.update(await customGameView(game.match.id));
+        } catch (error) {
+          customDrafts.delete(interaction.user.id);
+          throw error;
+        }
+      }
+
       if (scope === 'custom' && action === 'vote') {
         await castCustomMapVote(id, interaction.user.id, decodeURIComponent(extra || ''));
         return interaction.update(await customGameView(id));
@@ -213,14 +271,6 @@ client.on(Events.InteractionCreate, async interaction => {
 
     if (interaction.isModalSubmit()) {
       
-      if (interaction.customId === 'custom:create') {
-        const format = interaction.fields.getTextInputValue('format').trim().toLowerCase();
-        const team1 = interaction.fields.getTextInputValue('team1').split(/[,;\s]+/).filter(Boolean);
-        const team2 = interaction.fields.getTextInputValue('team2').split(/[,;\s]+/).filter(Boolean);
-        const game = await createCustomGame({ format, team1Ids: team1, team2Ids: team2, createdBy: interaction.user.id });
-        return interaction.reply({ ...(await customGameView(game.match.id)), ephemeral: true });
-      }
-
       if (interaction.customId === 'profile:save') {
         const nick = interaction.fields.getTextInputValue('nick').trim();
         const sid = interaction.fields.getTextInputValue('standoff_id').trim();
