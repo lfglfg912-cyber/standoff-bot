@@ -471,7 +471,7 @@ async function applyCompetitiveResult(client, winnerIds, loserIds, matchType = '
     await client.query('UPDATE players SET losses=$1, rating=$2, updated_at=NOW() WHERE discord_id=$3', [losses, rating, id]);
     if (rating !== oldRating) {
       await client.query(
-        "INSERT INTO rating_history (discord_id, match_type, old_rating, new_rating, delta) VALUES ($1,'match',$2,$3,$4)",
+        "INSERT INTO rating_history (discord_id, match_type, match_id, old_rating, new_rating, delta) VALUES ($1,$2,$3,$4,$5,$6)",
         [id, oldRating, rating, rating - oldRating]
       );
     }
