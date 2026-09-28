@@ -210,7 +210,9 @@ export function profileStatsEmbed(player) {
     { name: '⭐ Рейтинг', value: String(player.rating || 0), inline: true },
     { name: '📈 Winrate', value: winrate + '%', inline: true },
     { name: '⚔️ W / L', value: (player.wins || 0) + ' / ' + (player.losses || 0), inline: true },
-    { name: '🏆 Турниры', value: String(player.tournaments || 0), inline: true }
+    { name: '🏆 Турниры', value: String(player.tournaments || 0), inline: true },
+    { name: '🔥 Серия', value: String(player.win_streak || 0), inline: true },
+    { name: '🏅 Лучшая серия', value: String(player.best_streak || 0), inline: true }
   );
 }
 
