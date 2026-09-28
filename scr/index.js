@@ -3,8 +3,8 @@ import {
   Client, GatewayIntentBits, Events, PermissionsBitField, EmbedBuilder,
   REST, Routes
 } from 'discord.js';
-import { initDb, getPlayer, upsertPlayer, listPlayers, listTournaments, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
-import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons } from './ui.js';
+import { initDb, getPlayer, upsertPlayer, listPlayers, listTournaments, addModerationWarning, getModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
+import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, teamRegistrationModal, resultButtons, profileStatsEmbed, profileSimpleSection, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 import { aiEnabled, askAI } from './ai.js';
@@ -18,6 +18,14 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 function isAdmin(interaction) {
   if (!interaction.inGuild()) return false;
   return interaction.member.roles.cache.has(process.env.ADMIN_ROLE_ID) || interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+}
+
+function isModerator(interaction) {
+  if (!interaction.inGuild()) return false;
+  return isAdmin(interaction)
+    || interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers)
+    || interaction.member.permissions.has(PermissionsBitField.Flags.KickMembers)
+    || interaction.member.permissions.has(PermissionsBitField.Flags.BanMembers);
 }
 
 async function ensurePlayer(interaction) {
@@ -113,6 +121,19 @@ client.on(Events.InteractionCreate, async interaction => {
         await sendMainPanel(interaction.channel);
       }
       return;
+    }
+
+    if (interaction.isUserSelectMenu()) {
+      if (interaction.customId === 'mod:user') {
+        if (!isModerator(interaction)) return interaction.reply({ content: 'Недостаточно прав для модерации.', ephemeral: true });
+        const targetId = interaction.values[0];
+        const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+        if (!member) return interaction.reply({ content: '❌ Участник не найден на сервере.', ephemeral: true });
+        return interaction.update({
+          content: `🛡️ **Модерация участника**\n\nУчастник: <@${targetId}>\nВыбери действие:`,
+          components: moderationActions(targetId)
+        });
+      }
     }
 
     if (interaction.isButton()) {
@@ -248,6 +269,10 @@ client.on(Events.InteractionCreate, async interaction => {
         }
       }
 
+      if (scope === 'admin' && action === 'moderation') {
+        if (!isModerator(interaction)) return interaction.reply({ content: 'Недостаточно прав для модерации.', ephemeral: true });
+        return interaction.reply({ content: '🛡️ **Модерация**\n\nВыбери участника:', components: moderationUserSelect(), ephemeral: true });
+      }
       if (scope === 'admin' && action === 'create_tournament') {
         if (!isAdmin(interaction)) return interaction.reply({ content: 'Недостаточно прав.', ephemeral: true });
         return interaction.showModal(tournamentCreateModal());
@@ -270,6 +295,41 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     if (interaction.isModalSubmit()) {
+      if (interaction.customId.startsWith('mod:reason:')) {
+        if (!isModerator(interaction)) return interaction.reply({ content: 'Недостаточно прав для модерации.', ephemeral: true });
+        const [, , action, targetId] = interaction.customId.split(':');
+        const reason = interaction.fields.getTextInputValue('reason').trim();
+        const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+        if (!member) return interaction.reply({ content: '❌ Участник уже не находится на сервере.', ephemeral: true });
+        if (targetId === interaction.user.id) return interaction.reply({ content: '❌ Нельзя применить модерацию к самому себе.', ephemeral: true });
+        if (member.id === interaction.guild.ownerId) return interaction.reply({ content: '❌ Нельзя модерировать владельца сервера.', ephemeral: true });
+
+        if (action === 'warn') {
+          const warning = await addModerationWarning(interaction.guild.id, targetId, interaction.user.id, reason);
+          const count = (await getModerationWarnings(interaction.guild.id, targetId)).length;
+          await member.send(`⚠️ **Предупреждение на сервере ${interaction.guild.name}**\nПричина: ${reason}\nВсего предупреждений: ${count}`).catch(() => {});
+          return interaction.reply({ content: `⚠️ <@${targetId}> получил предупреждение #${warning.id}.\nПричина: **${reason}**\nВсего предупреждений: **${count}**.`, ephemeral: true });
+        }
+
+        if (action === 'timeout') {
+          if (!interaction.member.permissions.has(PermissionsBitField.Flags.ModerateMembers) && !isAdmin(interaction)) return interaction.reply({ content: 'Нужны права Moderate Members.', ephemeral: true });
+          await member.timeout(10 * 60 * 1000, reason);
+          return interaction.reply({ content: `🔇 <@${targetId}> получил тайм-аут на **10 минут**.\nПричина: **${reason}**`, ephemeral: true });
+        }
+
+        if (action === 'kick') {
+          if (!interaction.member.permissions.has(PermissionsBitField.Flags.KickMembers) && !isAdmin(interaction)) return interaction.reply({ content: 'Нужны права Kick Members.', ephemeral: true });
+          await member.kick(reason);
+          return interaction.reply({ content: `👢 <@${targetId}> кикнут.\nПричина: **${reason}**`, ephemeral: true });
+        }
+
+        if (action === 'ban') {
+          if (!interaction.member.permissions.has(PermissionsBitField.Flags.BanMembers) && !isAdmin(interaction)) return interaction.reply({ content: 'Нужны права Ban Members.', ephemeral: true });
+          await member.ban({ reason });
+          return interaction.reply({ content: `🔨 <@${targetId}> забанен.\nПричина: **${reason}**`, ephemeral: true });
+        }
+      }
+
       
       if (interaction.customId === 'profile:save') {
         const nick = interaction.fields.getTextInputValue('nick').trim();
