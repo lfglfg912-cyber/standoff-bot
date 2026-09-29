@@ -6,6 +6,7 @@ import {
 import { initDb, getPlayer, upsertPlayer, listPlayers, getLeaderboard, getRatingHistory, listTournaments, addModerationWarning, getModerationWarnings, clearModerationWarnings, createTournament, joinTournament, startTournament, getTournament, getOpenMatchForPlayer, reportMatch } from './db.js';
 import { mainPanel, profileCard, profileButtons, profileModal, aiModal, adminPanel, tournamentCreateModal, tournamentTeamNameModal, tournamentTeamSelection, resultButtons, resultScoreModal, profileStatsEmbed, profileSimpleSection, leaderboardEmbed, playMenuButtons, customFormatButtons, customPlayerSelection, customGameButtons, moderationUserSelect, moderationActions, moderationReasonModal, warningListButtons, tournamentCancelConfirm, roundVoteButtons } from './ui.js';
 import { tournamentsEmbed, tournamentButtons, tournamentView, matchesEmbed } from './tournament.js';
+import { setupVoiceRooms } from './voice-rooms.js';
 import { initTournamentV2Db, listTournamentsV2, createTournamentV2, registerTournamentTeam, startTournamentV2, cancelTournamentV2, castMapVote, reportMatchV2, getTournamentV2, TEAM_FORMATS, createCustomGame, getRoundVoteState, castRoundVote, getCustomRoundVoteState, castCustomRoundVote, getCustomGameState, castCustomMapVote, reportCustomGame, listCustomGamesForPlayer, getReadyCustomGamesForPlayer } from './tournament-v2.js';
 
 const required = ['DISCORD_TOKEN', 'DISCORD_CLIENT_ID', 'DISCORD_GUILD_ID', 'PANEL_CHANNEL_ID', 'ADMIN_ROLE_ID'];
@@ -133,6 +134,7 @@ client.once(Events.ClientReady, async ready => {
   try {
     await initDb();
     await initTournamentV2Db();
+    await setupVoiceRooms(client);
     console.log('[DOMINION] Database ready. Main panel is available with /p.');
     setInterval(() => refreshPanelChannels(), 60 * 60 * 1000);
     console.log('[DOMINION] Panel channels will be cleaned and refreshed every 60 minutes.');
